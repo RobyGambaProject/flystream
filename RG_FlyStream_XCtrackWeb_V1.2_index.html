@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>RGproject_AI_FlyStreamV2.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        /* --- STILI GENERALI --- */
+        body { margin: 0; padding: 0; background: #fff; overflow: hidden; font-family: sans-serif; }
+        #viewport { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; }
+        
+        /* --- MAPPA NEUTRA ISOIPSE --- */
+        #map { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            width: 220vmax; 
+            height: 220vmax; 
+            margin-top: -110vmax; 
+            margin-left: -110vmax; 
+            transition: transform 0.1s linear;
+            /* Filtro per enfatizzare solo le linee del terreno */
+            /*filter: grayscale(1) contrast(1.1) brightness(1.05);*/
+	    filter: grayscale(1) contrast(0.9) brightness(1.1);
+            background: #fff;
+        }
+        
+        /* --- CANVAS ANALISI OROGRAFICA --- */
+        #aeroCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1500; opacity: 0.7; }
+        
+        /* --- DASHBOARD DATI --- */
+        #dashboard { position: absolute; top: 0; left: 0; width: 100%; height: 110px; background: white; z-index: 2000; display: grid; grid-template-columns: 1fr 1fr 1fr; border-bottom: 2px solid #2c3e50; align-items: center; }
+        .box { border-right: 1px solid #ccc; padding: 5px; text-align: center; }
+        .label { font-size: 14px; font-weight: 800; color: #2980b9; display: block; text-transform: uppercase; }
+        .val { font-size: 52px; font-weight: 900; color: #2c3e50; line-height: 1; }
+
+        /* --- FRECCIA VENTO --- */
+        #wind-box { position: absolute; top: 130px; right: 20px; z-index: 2500; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 50%; border: 2px solid #2c3e50; width: 65px; height: 65px; display: flex; align-items: center; justify-content: center; }
+        #wind-arrow { width: 45px; height: 45px; transition: transform 0.2s linear; }
+        
+        /* --- ICONA PILOTA --- */
+        #pilot { 
+            position: fixed; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            z-index: 5000 !important; 
+            width: 35px; 
+            pointer-events: none;
+            will-change: transform; 
+        }
+        
+        #agl-txt { color: #e67e22; }
+
+        #signature-box {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 4000;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 5px 15px;
+            border-radius: 15px;
+            border: 1px solid #2c3e50;
+            font-family: "Comic Sans MS", "Comic Sans", cursive;
+            font-size: 14px;
+            font-weight: bold;
+            color: #2c3e50;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+
+<div id="signature-box">RG Project - AI FlyStream</div>
+
+<div id="dashboard">
+    <div class="box"><span class="label">Quota (m)</span><span id="alt-txt" class="val">---</span></div>
+    <div class="box"><span class="label">Vento (km/h)</span><span id="spd-txt" class="val">---</span></div>
+    <div class="box"><span class="label">AGL (m)</span><span id="agl-txt" class="val">---</span></div>
+</div>
+
+<div id="wind-box">
+    <svg id="wind-arrow" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="19" x2="12" y2="5"></line>
+        <polyline points="5 12 12 5 19 12"></polyline>
+    </svg>
+</div>
+
+<svg id="pilot" viewBox="0 0 24 24" fill="#3498db" stroke="white" stroke-width="1.5">
+    <path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z"/>
+</svg>
+
+<div id="viewport"><div id="map"></div></div>
+<canvas id="aeroCanvas"></canvas>
+
+<script>
+    // --- VARIABILI GLOBALI E CONFIGURAZIONE ---
+    const PUNTI_PER_GRADO = 1200;
+    const STEP_METRI = 90;
+    let terrainData = null;
+    let currentTile = "";
+    let flight = { lat: 44.8, lon: 9.1, hdg: 0, alt: 0, speed: 0, windSpd: 0, windDir: 0 };
+
+    // --- INIZIALIZZAZIONE MAPPA (Layer ad alta compatibilità) ---
+    const map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 13);
+    
+    // Layer 1: Base chiara e stabile (CartoDB Positron)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd',
+        maxZoom: 19
+    }).addTo(map);
+
+    // Layer 2: Overlay rilievo (OpenTopoMap Hillshading) per vedere le pendenze
+    L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        maxZoom: 17,
+        opacity: 0.4
+    }).addTo(map);
+    
+    const canvas = document.getElementById('aeroCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // --- ROUTINE RESIZE ---
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.onresize = resize;
+    resize();
+
+    // --- ROUTINE RECUPERO DATI DA XCTRACK ---
+    function updateFromXCTrack() {
+        try {
+            let xc = window.XCTrack || (window.parent && window.parent.XCTrack);
+            if (xc && typeof xc.getLocation === 'function') {
+                let data = JSON.parse(xc.getLocation());
+                flight.lat = Number(data.lat);
+                flight.lon = Number(data.lon);
+                flight.alt = Math.round(Number(data.altGps));
+                flight.hdg = Number(data.heading || 0);
+
+                // Calcolo Vento (Originale RG Project)
+                if (data.airspeed > 0) {
+                    let radH = Number(data.heading) * Math.PI / 180;
+                    let radB = Number(data.bearingGps) * Math.PI / 180;
+                    let airX = Number(data.airspeed) * Math.sin(radH);
+                    let airY = Number(data.airspeed) * Math.cos(radH);
+                    let gndX = Number(data.speedGps) * Math.sin(radB);
+                    let gndY = Number(data.speedGps) * Math.cos(radB);
+                    let wX = gndX - airX;
+                    let wY = gndY - airY;
+                    flight.windSpd = Math.round(Math.sqrt(wX*wX + wY*wY) * 3.6);
+                    flight.windDir = Math.round((Math.atan2(wX, wY) * 180 / Math.PI + 180) % 360);
+                } else if (data.windSpeed || (data.wind && data.wind.speed)) {
+                    let ws = data.windSpeed || (data.wind ? data.wind.speed : 0);
+                    let wd = data.windDirection || (data.wind ? data.wind.direction : 0);
+                    flight.windSpd = data.wind ? Math.round(Number(ws)) : Math.round(Number(ws) * 3.6);
+                    flight.windDir = Number(wd);
+                }
+                updateView();
+            }
+        } catch (e) { console.error("Errore update XCTrack:", e); }
+    }
+
+    // --- ROUTINE AGGIORNAMENTO VISTA E CARICAMENTO JSON ---
+    async function updateView() {
+        map.setView([flight.lat, flight.lon], 13, { animate: false });
+        document.getElementById('map').style.transform = `rotate(${-flight.hdg}deg)`;
+        document.getElementById('alt-txt').innerText = flight.alt;
+        document.getElementById('spd-txt').innerText = flight.windSpd;
+        
+        const arrowRot = (flight.windDir - flight.hdg) + 180;
+        document.getElementById('wind-arrow').style.transform = `rotate(${arrowRot}deg)`;
+
+        let tID = `map_${Math.floor(flight.lat)}_${Math.floor(flight.lon)}`;
+        if (currentTile !== tID) {
+            try {
+                const response = await fetch(`data_json/${tID}.json`);
+                if (response.ok) {
+                    const json = await response.json();
+                    terrainData = json.data;
+                    currentTile = tID;
+                }
+            } catch(e) { console.error("Errore fetch JSON:", e); }
+        }
+        drawAnalysis();
+    }
+
+    // --- ROUTINE DISEGNO ANALISI OROGRAFICA ---
+    function drawAnalysis() {
+        if (!terrainData) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const wspd = flight.windSpd;
+        const wdir = flight.windDir;
+        const rad = (wdir - 90) * (Math.PI / 180);
+        const vx = -Math.cos(rad); const vy = Math.sin(rad);
+        const res = 6; const rangeIdx = 0.045;
+
+        for (let x = 0; x < canvas.width; x += res) {
+            for (let y = 0; y < canvas.height; y += res) {
+                let relX = (x - canvas.width / 2) / (canvas.width / 2) * rangeIdx;
+                let relY = -(y - canvas.height / 2) / (canvas.height / 2) * rangeIdx;
+                const angleHdg = -flight.hdg * (Math.PI / 180);
+                let pLon = flight.lon + (relX * Math.cos(angleHdg) - relY * Math.sin(angleHdg));
+                let pLat = flight.lat + (relX * Math.sin(angleHdg) + relY * Math.cos(angleHdg));
+                let cx = Math.floor((pLon % 1) * PUNTI_PER_GRADO);
+                let cy = (PUNTI_PER_GRADO - 1) - Math.floor((pLat % 1) * PUNTI_PER_GRADO);
+
+                if (terrainData[cy] && terrainData[cy][cx]) {
+                    const h = terrainData[cy][cx];
+                    if (Math.abs(x - canvas.width/2) < res && Math.abs(y - canvas.height/2) < res) {
+                        document.getElementById('agl-txt').innerText = Math.round(flight.alt - h);
+                    }
+                    if (h >= flight.alt) {
+                        ctx.fillStyle = "rgba(40, 40, 40, 0.8)";
+                        ctx.fillRect(x, y, res, res); continue;
+                    }
+                    let inWakeShadow = false;
+                    for (let d = 1; d <= 6; d++) {
+                        let lx = Math.floor(((pLon - vx*0.00025*d) % 1) * PUNTI_PER_GRADO);
+                        let ly = (PUNTI_PER_GRADO-1) - Math.floor(((pLat - vy*0.00025*d) % 1) * PUNTI_PER_GRADO);
+                        if (terrainData[ly] && terrainData[ly][lx] > flight.alt - (d*35)) { inWakeShadow = true; break; }
+                    }
+                    const gx = ((terrainData[cy][cx+1]||h)-(terrainData[cy][cx-1]||h))/(2*STEP_METRI);
+                    const gy = ((terrainData[cy+1]?terrainData[cy+1][cx]:h)-(terrainData[cy-1]?terrainData[cy-1][cx]:h))/(2*STEP_METRI);
+                    let localForce = (vx * gx + vy * gy) * (wspd / 10);
+                    localForce *= Math.max(0, 1 - ((flight.alt - h) / (600 + wspd * 5)));
+                    if (inWakeShadow) ctx.fillStyle = "rgba(100, 100, 100, 0.6)";
+                    else if (localForce < -0.12) ctx.fillStyle = "rgba(231, 76, 60, 0.7)";
+                    else if (localForce > 0.08) ctx.fillStyle = "rgba(46, 204, 113, 0.6)";
+                    else ctx.fillStyle = "rgba(0,0,0,0)";
+                    ctx.fillRect(x, y, res, res);
+                }
+            }
+        }
+    }
+    
+    // --- AVVIO TIMER AGGIORNAMENTO ---
+    setInterval(updateFromXCTrack, 500);
+</script>
+</body>
+</html>
