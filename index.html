@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>FlyStream_Universal</title>
+    <title>FlyStream Online</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -19,7 +19,7 @@
         #wind-arrow { width: 45px; height: 45px; transition: transform 0.2s linear; }
         #pilot { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3000; width: 35px; pointer-events: none; }
         #agl-txt { color: #e67e22; }
-        #signature-box { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 4000; background: rgba(255, 255, 255, 0.7); padding: 5px 15px; border-radius: 15px; border: 1px solid #2c3e50; font-family: "Comic Sans MS", cursive; font-size: 14px; font-weight: bold; color: #2c3e50; white-space: nowrap; }
+        #signature-box { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 4000; background: rgba(255, 255, 255, 0.7); padding: 5px 15px; border-radius: 15px; border: 1px solid #2c3e50; font-family: "Comic Sans MS", cursive; font-size: 14px; font-weight: bold; color: #2c3e50; }
     </style>
 </head>
 <body>
@@ -37,8 +37,9 @@
 <script>
     const PUNTI_PER_GRADO = 1200;
     const STEP_METRI = 90;
-    // PERCORSO UNIVERSALE ANDROID
-    const PATH_JSON = "file:///storage/emulated/0/XCTrack/CustomWidgets/data_json/";
+    
+    // PERCORSO RELATIVO (carica dalla cartella su GitHub)
+    const PATH_JSON = "data_json/"; 
     
     let terrainData = null;
     let currentTile = "";
@@ -76,11 +77,14 @@
         let tID = `map_${Math.floor(flight.lat)}_${Math.floor(flight.lon)}`;
         if (currentTile !== tID) {
             try {
+                // Carica il JSON direttamente dal server GitHub
                 const response = await fetch(`${PATH_JSON}${tID}.json`);
-                const json = await response.json();
-                terrainData = json.data;
-                currentTile = tID;
-            } catch(e) {}
+                if (response.ok) {
+                    const json = await response.json();
+                    terrainData = json.data;
+                    currentTile = tID;
+                }
+            } catch(e) { console.error("Dati non trovati sul server"); }
         }
         drawAnalysis();
     }
