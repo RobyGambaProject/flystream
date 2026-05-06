@@ -53,17 +53,27 @@
     function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
     window.onresize = resize; resize();
 
-    function updateFromXCTrack() {
+function updateFromXCTrack() {
         try {
             let xc = window.XCTrack || (window.parent && window.parent.XCTrack);
             if (xc && typeof xc.getLocation === 'function') {
                 let data = JSON.parse(xc.getLocation());
-                flight.lat = data.lat; flight.lon = data.lon;
-                flight.alt = Math.round(data.altGps); flight.hdg = data.heading || 0;
-                if (data.windSpeed) { flight.windSpd = Math.round(data.windSpeed * 3.6); flight.windDir = data.windDirection; }
+                
+                // Conversione sicura in numeri
+                flight.lat = Number(data.lat); 
+                flight.lon = Number(data.lon);
+                flight.alt = Math.round(Number(data.altGps)); 
+                flight.hdg = Number(data.heading || 0);
+                
+                // Correzione Vento: controlliamo che la proprietà esista, anche se è 0
+                if (data.hasOwnProperty('windSpeed')) { 
+                    flight.windSpd = Math.round(Number(data.windSpeed) * 3.6); 
+                    flight.windDir = Number(data.windDirection || 0); 
+                }
+                
                 updateView();
             }
-        } catch (e) {}
+        } catch (e) { console.error("Errore dati XCTrack:", e); }
     }
 
     async function updateView() {
