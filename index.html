@@ -10,6 +10,8 @@
         body { margin: 0; padding: 0; background: #000; overflow: hidden; font-family: sans-serif; }
         #viewport { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; }
         #map { position: absolute; top: 50%; left: 50%; width: 220vmax; height: 220vmax; margin-top: -110vmax; margin-left: -110vmax; transition: transform 0.1s linear; }
+        
+        /* Canvas Analisi */
         #aeroCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1500; opacity: 0.6; }
         
         /* Dashboard ottimizzato per font 52px */
@@ -18,20 +20,31 @@
         .label { font-size: 14px; font-weight: 800; color: #2980b9; display: block; text-transform: uppercase; }
         .val { font-size: 52px; font-weight: 900; color: #2c3e50; line-height: 1; }
 
-        /* Freccia vento riposizionata per non sovrapporsi */
+        /* Freccia vento */
         #wind-box { position: absolute; top: 130px; right: 20px; z-index: 2500; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 50%; border: 2px solid #2c3e50; width: 65px; height: 65px; display: flex; align-items: center; justify-content: center; }
         #wind-arrow { width: 45px; height: 45px; transition: transform 0.2s linear; }
         
-        #pilot { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3000; width: 35px; pointer-events: none; }
+        /* --- FIX FRECCIA PILOTA SPARIZIONE --- */
+        #pilot { 
+            position: fixed; /* Forza la posizione rispetto al viewport */
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            z-index: 5000 !important; /* Sempre sopra mappa e canvas */
+            width: 35px; 
+            pointer-events: none;
+            will-change: transform; /* Ottimizza rendering GPU */
+        }
+        
         #agl-txt { color: #e67e22; }
 
         #signature-box {
             position: absolute;
-            bottom: 10px;      /* Distanza dal fondo */
+            bottom: 10px;
             left: 50%;
             transform: translateX(-50%);
-            z-index: 4000;     /* Sopra a tutto, anche al pilota */
-            background: rgba(255, 255, 255, 0.7); /* Sfondo semitrasparente */
+            z-index: 4000;
+            background: rgba(255, 255, 255, 0.7);
             padding: 5px 15px;
             border-radius: 15px;
             border: 1px solid #2c3e50;
@@ -60,6 +73,7 @@
     </svg>
 </div>
 
+<!-- Pilota bloccato in primo piano -->
 <svg id="pilot" viewBox="0 0 24 24" fill="#3498db" stroke="white" stroke-width="1.5">
     <path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z"/>
 </svg>
@@ -97,7 +111,7 @@
                 flight.alt = Math.round(Number(data.altGps));
                 flight.hdg = Number(data.heading || 0);
 
-                // Calcolo avanzato o fallback su dati diretti
+                // Calcolo avanzato Vento (Originale RG Project)
                 if (data.airspeed > 0) {
                     let radH = Number(data.heading) * Math.PI / 180;
                     let radB = Number(data.bearingGps) * Math.PI / 180;
@@ -127,14 +141,13 @@
         document.getElementById('alt-txt').innerText = flight.alt;
         document.getElementById('spd-txt').innerText = flight.windSpd;
         
-        // Rotazione invertita di 180° come richiesto
+        // Rotazione freccia vento
         const arrowRot = (flight.windDir - flight.hdg) + 180;
         document.getElementById('wind-arrow').style.transform = `rotate(${arrowRot}deg)`;
 
         let tID = `map_${Math.floor(flight.lat)}_${Math.floor(flight.lon)}`;
         if (currentTile !== tID) {
             try {
-                // MODIFICATO PER GITHUB ONLINE
                 const response = await fetch(`data_json/${tID}.json`);
                 if (response.ok) {
                     const json = await response.json();
