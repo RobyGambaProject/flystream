@@ -54,27 +54,28 @@
     window.onresize = resize; resize();
 
 function updateFromXCTrack() {
-        try {
-            let xc = window.XCTrack || (window.parent && window.parent.XCTrack);
-            if (xc && typeof xc.getLocation === 'function') {
-                let data = JSON.parse(xc.getLocation());
-                
-                // Conversione sicura in numeri
-                flight.lat = Number(data.lat); 
-                flight.lon = Number(data.lon);
-                flight.alt = Math.round(Number(data.altGps)); 
-                flight.hdg = Number(data.heading || 0);
-                
-                // Correzione Vento: controlliamo che la proprietà esista, anche se è 0
-                if (data.hasOwnProperty('windSpeed')) { 
-                    flight.windSpd = Math.round(Number(data.windSpeed) * 3.6); 
-                    flight.windDir = Number(data.windDirection || 0); 
-                }
-                
-                updateView();
+    try {
+        let xc = window.XCTrack || (window.parent && window.parent.XCTrack);
+        if (xc && typeof xc.getLocation === 'function') {
+            let data = JSON.parse(xc.getLocation());
+            
+            // Coordinate e Altimetria (Standard JSI)
+            flight.lat = Number(data.lat); 
+            flight.lon = Number(data.lon);
+            flight.alt = Math.round(Number(data.altGps)); 
+            flight.hdg = Number(data.heading || 0);
+            
+            // Gestione Vento secondo documentazione xctrack.org/downloads/jsi.html
+            if (data.wind) {
+                // ATTENZIONE: data.wind.speed è già in km/h!
+                flight.windSpd = Math.round(Number(data.wind.speed || 0)); 
+                flight.windDir = Number(data.wind.direction || 0); 
             }
-        } catch (e) { console.error("Errore dati XCTrack:", e); }
-    }
+            
+            updateView();
+        }
+    } catch (e) { console.error("Errore JSI XCTrack:", e); }
+}
 
     async function updateView() {
         map.setView([flight.lat, flight.lon], 13, { animate: false });
