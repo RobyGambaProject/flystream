@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>RGproject_AI_FlyStreamV2.5_Aggressive</title>
+    <title>RGproject_AI_FlyStreamV2.5.2</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -34,19 +34,34 @@
             border: 2px solid #2c3e50; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             display: flex; flex-direction: column; gap: 12px; min-width: 180px;
         }
-        .ctrl-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .ctrl-row label { font-weight: 900; font-size: 13px; color: #2c3e50; pointer-events: none; }
+
+        /* --- ELEMENTI IN BASSO (FIRMA E VERSIONE) --- */
+        #signature-box { 
+            position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); 
+            z-index: 4000; background: rgba(255, 255, 255, 0.7); padding: 5px 15px; 
+            border-radius: 15px; border: 1px solid #2c3e50; font-family: "Comic Sans MS", cursive; 
+            font-size: 14px; font-weight: bold; color: #2c3e50; 
+        }
+
+        #version-box { 
+            position: absolute; bottom: 10px; right: 15px; z-index: 6000; 
+            background: rgba(44, 62, 80, 0.9); color: #fff; padding: 3px 8px; 
+            border-radius: 5px; font-size: 11px; font-weight: bold; font-family: monospace;
+            border: 1px solid rgba(255,255,255,0.4);
+        }
 
         /* --- ALTRI ELEMENTI --- */
         #wind-box { position: absolute; top: 130px; right: 20px; z-index: 2500; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 50%; border: 2px solid #2c3e50; width: 65px; height: 65px; display: flex; align-items: center; justify-content: center; }
         #wind-arrow { width: 45px; height: 45px; transition: transform 0.2s linear; }
         #pilot { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5000 !important; width: 35px; pointer-events: none; }
         #agl-txt { color: #e67e22; }
-        #signature-box { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 4000; background: rgba(255, 255, 255, 0.7); padding: 5px 15px; border-radius: 15px; border: 1px solid #2c3e50; font-family: "Comic Sans MS", cursive; font-size: 14px; font-weight: bold; color: #2c3e50; }
+        .ctrl-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .ctrl-row label { font-weight: 900; font-size: 13px; color: #2c3e50; pointer-events: none; }
     </style>
 </head>
 <body>
 
+<div id="version-box">V.2.5.2</div>
 <div id="signature-box">RG Project - AI FlyStream</div>
 
 <div id="dashboard">
@@ -108,7 +123,6 @@
        ROUTINE: init
        ========================================================================= */
     function init() {
-        // REM: Variabili locali per caricamento memoria
         let savedDynamic, savedBN, cbDyn, cbBN;
 
         try {
@@ -230,10 +244,8 @@
 
     /* =========================================================================
        ROUTINE: drawAnalysis
-       LOGICA "CATTIVA": SCIA PIU' LUNGA E DECADIMENTO LENTO
        ========================================================================= */
     function drawAnalysis() {
-        // --- VARIABILI LOCALI ---
         let wspd, wdir, rad, vx, vy, res, rangeIdx, dropValue, maxSteps;
         let x, y, relX, relY, angleHdg, pLon, pLat, cx, cy, h;
         let inWakeShadow, d, lx, ly, gx, gy, localForce;
@@ -247,8 +259,7 @@
         vx   = -Math.cos(rad); vy = Math.sin(rad);
         res  = 6; rangeIdx = 0.045;
 
-        // REM: LOGICA AGGRESSIVA - dropValue parte da 40 e cala più lentamente (molt. 0.8)
-        // REM: maxSteps ora è dinamico e fluido: più vento = più profondità di calcolo
+        // REM: LOGICA AGGRESSIVA V2.5
         if (isDynamic) {
             dropValue = Math.max(8, 40 - (wspd * 0.8)); 
             maxSteps  = Math.min(16, Math.floor(wspd / 1.5) + 4); 
