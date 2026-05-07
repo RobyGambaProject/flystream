@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>RGproject_AI_FlyStreamV2.3_Persistent</title>
+    <title>RGproject_AI_FlyStreamV2.4_SolidState</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -84,23 +84,21 @@
     /* =========================================================================
        SEZIONE 1: COSTANTI E CONFIGURAZIONE (PARAMETRI DI SISTEMA)
        ========================================================================= */
-    const PUNTI_PER_GRADO = 1200;  // REM: Risoluzione dati SRTM
+    const PUNTI_PER_GRADO = 1200;  // REM: Risoluzione dati SRTM (3 arc-secondi)
     const STEP_METRI      = 90;    // REM: Distanza lineare tra campioni quota
 
     /* =========================================================================
        SEZIONE 2: VARIABILI GLOBALI (STATO DEL SISTEMA)
        ========================================================================= */
-    let terrainData = null;      // REM: Buffer dati tile corrente
-    let currentTile = "";        // REM: ID tile caricato
-    let map         = null;      // REM: Oggetto Leaflet
-    let canvas      = null;      // REM: Elemento DOM Canvas
-    let ctx         = null;      // REM: Contesto grafico 2D
+    let terrainData = null;      // REM: Buffer dati tile corrente (matrice quote)
+    let currentTile = "";        // REM: ID tile caricato (es: map_44_9)
+    let map         = null;      // REM: Oggetto Leaflet (mappa base)
+    let canvas      = null;      // REM: Elemento DOM Canvas per overlay tecnico
+    let ctx         = null;      // REM: Contesto grafico 2D per rendering
+    let isDynamic   = true;      // REM: Stato calcolo scia (dinamica vs fissa)
+    let isBN        = false;     // REM: Stato visivo mappa (colori vs bianco/nero)
 
-    // REM: Recupero stati persistenti da memoria browser per evitare reset checkbox
-    let isDynamic   = localStorage.getItem('isDynamic') !== 'false'; 
-    let isBN        = localStorage.getItem('isBN') === 'true';       
-    
-    // REM: Oggetto Stato del Volo raggruppato
+    // REM: Oggetto Stato del Volo raggruppato (sincronizzato con XCTrack)
     let flight = { 
         lat: 44.8, lon: 9.1, hdg: 0, alt: 0, 
         speed: 0, windSpd: 0, windDir: 0 
@@ -108,29 +106,43 @@
 
     /* =========================================================================
        ROUTINE: init
-       INIZIALIZZAZIONE AMBIENTE E RIPRISTINO STATI
+       INIZIALIZZAZIONE AMBIENTE, CARICAMENTO MEMORIA E LISTENER
        ========================================================================= */
     function init() {
+        // REM: Variabili locali per caricamento memoria
+        let savedDynamic, savedBN, cbDyn, cbBN;
+
+        // REM: Tentativo di recupero stati persistenti da LocalStorage
+        try {
+            savedDynamic = localStorage.getItem('rg_isDynamic');
+            savedBN = localStorage.getItem('rg_isBN');
+            
+            if (savedDynamic !== null) isDynamic = (savedDynamic === 'true');
+            if (savedBN !== null) isBN = (savedBN === 'true');
+        } catch (e) { console.warn("REM: Accesso LocalStorage negato o non disponibile"); }
+
         canvas = document.getElementById('aeroCanvas');
         ctx = canvas.getContext('2d');
         
         map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 13);
         L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
 
-        // REM: Sincronizzazione visiva checkbox con variabili globali persistenti
-        document.getElementById('chkDynamic').checked = isDynamic;
-        document.getElementById('chkMapBN').checked = isBN;
+        // REM: Collegamento elementi interfaccia e ripristino stato visivo
+        cbDyn = document.getElementById('chkDynamic');
+        cbBN = document.getElementById('chkMapBN');
+        cbDyn.checked = isDynamic;
+        cbBN.checked = isBN;
 
-        // REM: Listener per Scia Dinamica con salvataggio stato
-        document.getElementById('chkDynamic').addEventListener('change', (e) => {
+        // REM: Listener per switch Scia Dinamica con salvataggio immediato
+        cbDyn.addEventListener('change', (e) => {
             isDynamic = e.target.checked;
-            localStorage.setItem('isDynamic', isDynamic);
+            localStorage.setItem('rg_isDynamic', isDynamic);
         });
 
-        // REM: Listener per Mappa BN con salvataggio stato
-        document.getElementById('chkMapBN').addEventListener('change', (e) => {
+        // REM: Listener per switch Mappa BN con salvataggio immediato
+        cbBN.addEventListener('change', (e) => {
             isBN = e.target.checked;
-            localStorage.setItem('isBN', isBN);
+            localStorage.setItem('rg_isBN', isBN);
             applyMapStyle();
         });
 
@@ -142,13 +154,17 @@
 
     /* =========================================================================
        ROUTINE: applyMapStyle
-       FORZA L'APPLICAZIONE DEI FILTRI CSS ALLA MAPPA
+       FORZA L'APPLICAZIONE DEI FILTRI CSS PER IL MANTENIMENTO DEL B/N
        ========================================================================= */
     function applyMapStyle() {
+        // --- VARIABILI LOCALI ---
         let mapDiv = document.getElementById('map');
+
         if (isBN) {
+            // REM: Filtro tecnico per alta leggibilità isoipse
             mapDiv.style.filter = "grayscale(1) contrast(1.8) brightness(0.9) opacity(0.8)";
         } else {
+            // REM: Ripristino colori naturali OpenTopo
             mapDiv.style.filter = "none";
         }
     }
@@ -160,7 +176,7 @@
 
     /* =========================================================================
        ROUTINE: updateFromXCTrack
-       RECUPERA DATI GPS E CALCOLA IL VENTO (PUNTO A)
+       INTERFACCIA DATI XCTRACK E CALCOLO VETTORIALE VENTO
        ========================================================================= */
     function updateFromXCTrack() {
         // --- VARIABILI LOCALI ---
@@ -198,16 +214,16 @@
 
     /* =========================================================================
        ROUTINE: updateView
-       GESTIONE PERSISTENZA MAPPA E CARICAMENTO JSON
+       GESTIONE PERSISTENZA MAPPA E AGGIORNAMENTO POSIZIONE
        ========================================================================= */
     async function updateView() {
         // --- VARIABILI LOCALI ---
-        let tID, arrowRot;
+        let tID, arrowRot, response, json;
 
         map.setView([flight.lat, flight.lon], 13, { animate: false });
         document.getElementById('map').style.transform = `rotate(${-flight.hdg}deg)`;
         
-        // REM: Riapplica sempre lo stile per evitare reset durante il caricamento tile
+        // REM: Riapplicazione forzata filtro BN per evitare reset durante refresh tiles
         applyMapStyle(); 
 
         document.getElementById('alt-txt').innerText = flight.alt;
@@ -219,9 +235,9 @@
         tID = `map_${Math.floor(flight.lat)}_${Math.floor(flight.lon)}`;
         if (currentTile !== tID) {
             try {
-                const response = await fetch(`data_json/${tID}.json`);
+                response = await fetch(`data_json/${tID}.json`);
                 if (response.ok) {
-                    const json = await response.json();
+                    json = await response.json();
                     terrainData = json.data;
                     currentTile = tID;
                     applyMapStyle(); 
@@ -233,7 +249,7 @@
 
     /* =========================================================================
        ROUTINE: drawAnalysis
-       MOTORE OROGRAFICO CON LOGICA DINAMICA (PUNTO B/C)
+       MOTORE DI RENDERING OROGRAFICO E ANALISI TURBOLENZA
        ========================================================================= */
     function drawAnalysis() {
         // --- VARIABILI LOCALI ---
@@ -250,7 +266,7 @@
         vx   = -Math.cos(rad); vy = Math.sin(rad);
         res  = 6; rangeIdx = 0.045;
 
-        // REM: Calcolo estensione turbolenza basato su velocità vento se isDynamic=true
+        // REM: Configurazione parametri scia basata su stato checkbox Dinamica
         if (isDynamic) {
             dropValue = Math.max(10, 50 - (wspd * 1.2)); 
             maxSteps  = wspd > 20 ? 12 : 6;              
@@ -280,7 +296,7 @@
                         ctx.fillRect(x, y, res, res); continue;
                     }
 
-                    // REM: Analisi ombra aerodinamica (Scia)
+                    // REM: Algoritmo di Ray-casting per rilevamento zone sottovento
                     inWakeShadow = false;
                     for (d = 1; d <= maxSteps; d++) {
                         lx = Math.floor(((pLon - vx*0.00025*d) % 1) * PUNTI_PER_GRADO);
@@ -290,7 +306,7 @@
                         }
                     }
 
-                    // REM: Calcolo incidenza vento su pendenza terreno
+                    // REM: Calcolo locale della portanza/discendenza dinamica
                     gx = ((terrainData[cy][cx+1]||h)-(terrainData[cy][cx-1]||h))/(2*STEP_METRI);
                     gy = ((terrainData[cy+1]?terrainData[cy+1][cx]:h)-(terrainData[cy-1]?terrainData[cy-1][cx]:h))/(2*STEP_METRI);
                     localForce = (vx * gx + vy * gy) * (wspd / 10);
