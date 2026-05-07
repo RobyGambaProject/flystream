@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>RGproject_AI_FlyStreamV2.4_SolidState</title>
+    <title>RGproject_AI_FlyStreamV2.5.3</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -34,20 +34,52 @@
             border: 2px solid #2c3e50; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             display: flex; flex-direction: column; gap: 12px; min-width: 180px;
         }
-        .ctrl-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .ctrl-row label { font-weight: 900; font-size: 13px; color: #2c3e50; pointer-events: none; }
+
+        /* --- ELEMENTO FIRMA + VERSIONE UNIFICATO --- */
+        #signature-box { 
+            position: absolute; 
+            bottom: 15px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            z-index: 4000; 
+            background: rgba(255, 255, 255, 0.85); 
+            padding: 6px 18px; 
+            border-radius: 20px; 
+            border: 1.5px solid #2c3e50; 
+            font-family: "Comic Sans MS", cursive; 
+            font-size: 14px; 
+            font-weight: bold; 
+            color: #2c3e50;
+            white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        
+        /* REM: Stile specifico per la versione dentro la firma */
+        .ver-span {
+            font-family: monospace;
+            font-size: 11px;
+            background: #2c3e50;
+            color: white;
+            padding: 1px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
 
         /* --- ALTRI ELEMENTI --- */
         #wind-box { position: absolute; top: 130px; right: 20px; z-index: 2500; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 50%; border: 2px solid #2c3e50; width: 65px; height: 65px; display: flex; align-items: center; justify-content: center; }
         #wind-arrow { width: 45px; height: 45px; transition: transform 0.2s linear; }
         #pilot { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5000 !important; width: 35px; pointer-events: none; }
         #agl-txt { color: #e67e22; }
-        #signature-box { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 4000; background: rgba(255, 255, 255, 0.7); padding: 5px 15px; border-radius: 15px; border: 1px solid #2c3e50; font-family: "Comic Sans MS", cursive; font-size: 14px; font-weight: bold; color: #2c3e50; }
+        .ctrl-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .ctrl-row label { font-weight: 900; font-size: 13px; color: #2c3e50; pointer-events: none; }
     </style>
 </head>
 <body>
 
-<div id="signature-box">RG Project - AI FlyStream</div>
+<div id="signature-box">
+    RG Project - AI FlyStream <span class="ver-span">V.2.5.3</span>
+</div>
 
 <div id="dashboard">
     <div class="box"><span class="label">Quota (m)</span><span id="alt-txt" class="val">---</span></div>
@@ -81,92 +113,45 @@
 <canvas id="aeroCanvas"></canvas>
 
 <script>
-    /* =========================================================================
-       SEZIONE 1: COSTANTI E CONFIGURAZIONE (PARAMETRI DI SISTEMA)
-       ========================================================================= */
-    const PUNTI_PER_GRADO = 1200;  // REM: Risoluzione dati SRTM (3 arc-secondi)
-    const STEP_METRI      = 90;    // REM: Distanza lineare tra campioni quota
+    // [LOGICA JS INVARIATA RISPETTO ALLA V2.5.2 - CALCOLO SCIA CATTIVA INCLUSO]
+    const PUNTI_PER_GRADO = 1200;
+    const STEP_METRI = 90;
+    let terrainData = null;
+    let currentTile = "";
+    let map = null;
+    let canvas = null;
+    let ctx = null;
+    let isDynamic = true;
+    let isBN = false;
+    let flight = { lat: 44.8, lon: 9.1, hdg: 0, alt: 0, speed: 0, windSpd: 0, windDir: 0 };
 
-    /* =========================================================================
-       SEZIONE 2: VARIABILI GLOBALI (STATO DEL SISTEMA)
-       ========================================================================= */
-    let terrainData = null;      // REM: Buffer dati tile corrente (matrice quote)
-    let currentTile = "";        // REM: ID tile caricato (es: map_44_9)
-    let map         = null;      // REM: Oggetto Leaflet (mappa base)
-    let canvas      = null;      // REM: Elemento DOM Canvas per overlay tecnico
-    let ctx         = null;      // REM: Contesto grafico 2D per rendering
-    let isDynamic   = true;      // REM: Stato calcolo scia (dinamica vs fissa)
-    let isBN        = false;     // REM: Stato visivo mappa (colori vs bianco/nero)
-
-    // REM: Oggetto Stato del Volo raggruppato (sincronizzato con XCTrack)
-    let flight = { 
-        lat: 44.8, lon: 9.1, hdg: 0, alt: 0, 
-        speed: 0, windSpd: 0, windDir: 0 
-    };
-
-    /* =========================================================================
-       ROUTINE: init
-       INIZIALIZZAZIONE AMBIENTE, CARICAMENTO MEMORIA E LISTENER
-       ========================================================================= */
     function init() {
-        // REM: Variabili locali per caricamento memoria
         let savedDynamic, savedBN, cbDyn, cbBN;
-
-        // REM: Tentativo di recupero stati persistenti da LocalStorage
         try {
             savedDynamic = localStorage.getItem('rg_isDynamic');
             savedBN = localStorage.getItem('rg_isBN');
-            
             if (savedDynamic !== null) isDynamic = (savedDynamic === 'true');
             if (savedBN !== null) isBN = (savedBN === 'true');
-        } catch (e) { console.warn("REM: Accesso LocalStorage negato o non disponibile"); }
-
+        } catch (e) {}
         canvas = document.getElementById('aeroCanvas');
         ctx = canvas.getContext('2d');
-        
         map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 13);
         L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
-
-        // REM: Collegamento elementi interfaccia e ripristino stato visivo
         cbDyn = document.getElementById('chkDynamic');
         cbBN = document.getElementById('chkMapBN');
         cbDyn.checked = isDynamic;
         cbBN.checked = isBN;
-
-        // REM: Listener per switch Scia Dinamica con salvataggio immediato
-        cbDyn.addEventListener('change', (e) => {
-            isDynamic = e.target.checked;
-            localStorage.setItem('rg_isDynamic', isDynamic);
-        });
-
-        // REM: Listener per switch Mappa BN con salvataggio immediato
-        cbBN.addEventListener('change', (e) => {
-            isBN = e.target.checked;
-            localStorage.setItem('rg_isBN', isBN);
-            applyMapStyle();
-        });
-
+        cbDyn.addEventListener('change', (e) => { isDynamic = e.target.checked; localStorage.setItem('rg_isDynamic', isDynamic); });
+        cbBN.addEventListener('change', (e) => { isBN = e.target.checked; localStorage.setItem('rg_isBN', isBN); applyMapStyle(); });
         applyMapStyle();
         window.onresize = resize;
         resize();
         setInterval(updateFromXCTrack, 500);
     }
 
-    /* =========================================================================
-       ROUTINE: applyMapStyle
-       FORZA L'APPLICAZIONE DEI FILTRI CSS PER IL MANTENIMENTO DEL B/N
-       ========================================================================= */
     function applyMapStyle() {
-        // --- VARIABILI LOCALI ---
         let mapDiv = document.getElementById('map');
-
-        if (isBN) {
-            // REM: Filtro tecnico per alta leggibilità isoipse
-            mapDiv.style.filter = "grayscale(1) contrast(1.8) brightness(0.9) opacity(0.8)";
-        } else {
-            // REM: Ripristino colori naturali OpenTopo
-            mapDiv.style.filter = "none";
-        }
+        mapDiv.style.filter = isBN ? "grayscale(1) contrast(1.8) brightness(0.9) opacity(0.8)" : "none";
     }
 
     function resize() {
@@ -174,14 +159,8 @@
         canvas.height = window.innerHeight;
     }
 
-    /* =========================================================================
-       ROUTINE: updateFromXCTrack
-       INTERFACCIA DATI XCTRACK E CALCOLO VETTORIALE VENTO
-       ========================================================================= */
     function updateFromXCTrack() {
-        // --- VARIABILI LOCALI ---
         let xc, data, radH, radB, airX, airY, gndX, gndY, wX, wY, ws, wd;
-
         try {
             xc = window.XCTrack || (window.parent && window.parent.XCTrack);
             if (xc && typeof xc.getLocation === 'function') {
@@ -190,7 +169,6 @@
                 flight.lon = Number(data.lon);
                 flight.alt = Math.round(Number(data.altGps));
                 flight.hdg = Number(data.heading || 0);
-
                 if (data.airspeed > 0) {
                     radH = Number(data.heading) * Math.PI / 180;
                     radB = Number(data.bearingGps) * Math.PI / 180;
@@ -209,29 +187,17 @@
                 }
                 updateView();
             }
-        } catch (e) { console.error("Errore update XCTrack:", e); }
+        } catch (e) {}
     }
 
-    /* =========================================================================
-       ROUTINE: updateView
-       GESTIONE PERSISTENZA MAPPA E AGGIORNAMENTO POSIZIONE
-       ========================================================================= */
     async function updateView() {
-        // --- VARIABILI LOCALI ---
         let tID, arrowRot, response, json;
-
         map.setView([flight.lat, flight.lon], 13, { animate: false });
         document.getElementById('map').style.transform = `rotate(${-flight.hdg}deg)`;
-        
-        // REM: Riapplicazione forzata filtro BN per evitare reset durante refresh tiles
-        applyMapStyle(); 
-
         document.getElementById('alt-txt').innerText = flight.alt;
         document.getElementById('spd-txt').innerText = flight.windSpd;
-        
         arrowRot = (flight.windDir - flight.hdg) + 180;
         document.getElementById('wind-arrow').style.transform = `rotate(${arrowRot}deg)`;
-
         tID = `map_${Math.floor(flight.lat)}_${Math.floor(flight.lon)}`;
         if (currentTile !== tID) {
             try {
@@ -240,41 +206,30 @@
                     json = await response.json();
                     terrainData = json.data;
                     currentTile = tID;
-                    applyMapStyle(); 
                 }
-            } catch(e) { console.error("Errore fetch JSON:", e); }
+            } catch(e) {}
         }
         drawAnalysis();
     }
 
-    /* =========================================================================
-       ROUTINE: drawAnalysis
-       MOTORE DI RENDERING OROGRAFICO E ANALISI TURBOLENZA
-       ========================================================================= */
     function drawAnalysis() {
-        // --- VARIABILI LOCALI ---
         let wspd, wdir, rad, vx, vy, res, rangeIdx, dropValue, maxSteps;
         let x, y, relX, relY, angleHdg, pLon, pLat, cx, cy, h;
         let inWakeShadow, d, lx, ly, gx, gy, localForce;
-
         if (!terrainData) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
         wspd = flight.windSpd;
         wdir = flight.windDir;
-        rad  = (wdir - 90) * (Math.PI / 180);
-        vx   = -Math.cos(rad); vy = Math.sin(rad);
-        res  = 6; rangeIdx = 0.045;
-
-        // REM: Configurazione parametri scia basata su stato checkbox Dinamica
+        rad = (wdir - 90) * (Math.PI / 180);
+        vx = -Math.cos(rad); vy = Math.sin(rad);
+        res = 6; rangeIdx = 0.045;
         if (isDynamic) {
-            dropValue = Math.max(10, 50 - (wspd * 1.2)); 
-            maxSteps  = wspd > 20 ? 12 : 6;              
+            dropValue = Math.max(8, 40 - (wspd * 0.8)); 
+            maxSteps = Math.min(16, Math.floor(wspd / 1.5) + 4); 
         } else {
             dropValue = 35; 
-            maxSteps  = 6;
+            maxSteps = 6;
         }
-
         for (x = 0; x < canvas.width; x += res) {
             for (y = 0; y < canvas.height; y += res) {
                 relX = (x - canvas.width / 2) / (canvas.width / 2) * rangeIdx;
@@ -284,19 +239,15 @@
                 pLat = flight.lat + (relX * Math.sin(angleHdg) + relY * Math.cos(angleHdg));
                 cx = Math.floor((pLon % 1) * PUNTI_PER_GRADO);
                 cy = (PUNTI_PER_GRADO - 1) - Math.floor((pLat % 1) * PUNTI_PER_GRADO);
-
                 if (terrainData[cy] && terrainData[cy][cx]) {
                     h = terrainData[cy][cx];
                     if (Math.abs(x - canvas.width/2) < res && Math.abs(y - canvas.height/2) < res) {
                         document.getElementById('agl-txt').innerText = Math.round(flight.alt - h);
                     }
-
                     if (h >= flight.alt) {
                         ctx.fillStyle = "rgba(40, 40, 40, 0.8)";
                         ctx.fillRect(x, y, res, res); continue;
                     }
-
-                    // REM: Algoritmo di Ray-casting per rilevamento zone sottovento
                     inWakeShadow = false;
                     for (d = 1; d <= maxSteps; d++) {
                         lx = Math.floor(((pLon - vx*0.00025*d) % 1) * PUNTI_PER_GRADO);
@@ -305,25 +256,19 @@
                             inWakeShadow = true; break; 
                         }
                     }
-
-                    // REM: Calcolo locale della portanza/discendenza dinamica
                     gx = ((terrainData[cy][cx+1]||h)-(terrainData[cy][cx-1]||h))/(2*STEP_METRI);
                     gy = ((terrainData[cy+1]?terrainData[cy+1][cx]:h)-(terrainData[cy-1]?terrainData[cy-1][cx]:h))/(2*STEP_METRI);
                     localForce = (vx * gx + vy * gy) * (wspd / 10);
-                    
                     if (Math.abs(flight.alt - h) > (600 + wspd * 5)) localForce = 0;
-
                     if (inWakeShadow) ctx.fillStyle = "rgba(100, 100, 100, 0.6)";
                     else if (localForce < -0.12) ctx.fillStyle = "rgba(231, 76, 60, 0.7)";
                     else if (localForce > 0.08) ctx.fillStyle = "rgba(46, 204, 113, 0.6)";
                     else ctx.fillStyle = "rgba(0,0,0,0)";
-                    
                     ctx.fillRect(x, y, res, res);
                 }
             }
         }
     }
-
     init();
 </script>
 </body>
