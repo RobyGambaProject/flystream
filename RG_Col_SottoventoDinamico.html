@@ -32,6 +32,13 @@
         .label { font-size: 14px; font-weight: 800; color: #2980b9; display: block; text-transform: uppercase; }
         .val { font-size: 52px; font-weight: 900; color: #2c3e50; line-height: 1; }
 
+        /* --- CONTROLLO DINAMICO --- */
+        #config-panel {
+            position: absolute; top: 115px; left: 10px; z-index: 3000;
+            background: rgba(255, 255, 255, 0.9); padding: 8px 12px; border-radius: 8px;
+            border: 1px solid #2c3e50; font-weight: bold; font-size: 12px; display: flex; align-items: center; gap: 8px;
+        }
+
         /* --- FRECCIA VENTO --- */
         #wind-box { position: absolute; top: 130px; right: 20px; z-index: 2500; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 50%; border: 2px solid #2c3e50; width: 65px; height: 65px; display: flex; align-items: center; justify-content: center; }
         #wind-arrow { width: 45px; height: 45px; transition: transform 0.2s linear; }
@@ -57,6 +64,11 @@
     <div class="box"><span class="label">AGL (m)</span><span id="agl-txt" class="val">---</span></div>
 </div>
 
+<div id="config-panel">
+    <input type="checkbox" id="chkDynamic" checked style="transform: scale(1.5);">
+    <label for="chkDynamic">SCIA DINAMICA</label>
+</div>
+
 <div id="wind-box">
     <svg id="wind-arrow" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
         <line x1="12" y1="19" x2="12" y2="5"></line>
@@ -77,7 +89,6 @@
        ========================================================================= */
     const PUNTI_PER_GRADO = 1200;  // REM: Risoluzione dati SRTM (3 arc-secondi)
     const STEP_METRI      = 90;    // REM: Distanza lineare tra campioni quota
-    const DYNAMIC_SHADOW  = true;  // REM: TRUE = Calcolo dinamico scia, FALSE = 35m fisso
 
     /* =========================================================================
        SEZIONE 2: VARIABILI GLOBALI (STATO DEL SISTEMA)
@@ -87,6 +98,7 @@
     let map         = null;  // REM: Oggetto Leaflet
     let canvas      = null;  // REM: Elemento DOM Canvas
     let ctx         = null;  // REM: Contesto grafico 2D
+    let isDynamic   = true;  // REM: Stato dello switch Scia (da checkbox)
     
     // Oggetto Stato del Volo: Raggruppa dati da XCTrack
     let flight = { 
@@ -96,7 +108,6 @@
 
     /* =========================================================================
        ROUTINE: init
-       INIZIALIZZAZIONE AMBIENTE E MAPPA
        ========================================================================= */
     function init() {
         canvas = document.getElementById('aeroCanvas');
@@ -104,6 +115,11 @@
         
         map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 13);
         L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
+
+        // Listener per il checkbox
+        document.getElementById('chkDynamic').addEventListener('change', function(e) {
+            isDynamic = e.target.checked;
+        });
 
         window.onresize = resize;
         resize();
@@ -117,7 +133,6 @@
 
     /* =========================================================================
        ROUTINE: updateFromXCTrack
-       RECUPERA DATI GPS/VENTO DA XCTRACK
        ========================================================================= */
     function updateFromXCTrack() {
         // --- VARIABILI LOCALI ---
@@ -132,7 +147,6 @@
                 flight.alt = Math.round(Number(data.altGps));
                 flight.hdg = Number(data.heading || 0);
 
-                // Calcolo Vento Vettoriale (Stesso principio manuale punto A)
                 if (data.airspeed > 0) {
                     radH = Number(data.heading) * Math.PI / 180;
                     radB = Number(data.bearingGps) * Math.PI / 180;
@@ -156,7 +170,6 @@
 
     /* =========================================================================
        ROUTINE: updateView
-       SINCRONIZZA MAPPA E CARICA JSON TERRENO
        ========================================================================= */
     async function updateView() {
         // --- VARIABILI LOCALI ---
@@ -186,7 +199,6 @@
 
     /* =========================================================================
        ROUTINE: drawAnalysis
-       MOTORE FLUIDODINAMICO (SLOPE, DROP DINAMICO E COLORI)
        ========================================================================= */
     function drawAnalysis() {
         // --- VARIABILI LOCALI ---
@@ -203,12 +215,13 @@
         vx   = -Math.cos(rad); vy = Math.sin(rad);
         res  = 6; rangeIdx = 0.045;
 
-        // CALCOLO DINAMICO PARAMETRI SCIA (In base a velocità vento)
-        if (DYNAMIC_SHADOW) {
-            dropValue = Math.max(10, 50 - (wspd * 1.2)); // REM: Pendenza calo scia
-            maxSteps  = wspd > 20 ? 12 : 6;              // REM: Estensione scansione
+        // LOGICA SWITCH DINAMICA VS FISSA
+        if (isDynamic) {
+            dropValue = Math.max(10, 50 - (wspd * 1.2)); 
+            maxSteps  = wspd > 20 ? 12 : 6;              
         } else {
-            dropValue = 35; maxSteps = 6;
+            dropValue = 35; 
+            maxSteps  = 6;
         }
 
         for (x = 0; x < canvas.width; x += res) {
@@ -232,7 +245,6 @@
                         ctx.fillRect(x, y, res, res); continue;
                     }
 
-                    // 1. ANALISI WAKE SHADOW DINAMICO
                     inWakeShadow = false;
                     for (d = 1; d <= maxSteps; d++) {
                         lx = Math.floor(((pLon - vx*0.00025*d) % 1) * PUNTI_PER_GRADO);
@@ -242,15 +254,12 @@
                         }
                     }
 
-                    // 2. CALCOLO SLOPE E INCIDENZA
                     gx = ((terrainData[cy][cx+1]||h)-(terrainData[cy][cx-1]||h))/(2*STEP_METRI);
                     gy = ((terrainData[cy+1]?terrainData[cy+1][cx]:h)-(terrainData[cy-1]?terrainData[cy-1][cx]:h))/(2*STEP_METRI);
                     localForce = (vx * gx + vy * gy) * (wspd / 10);
                     
-                    // Soglia d'influenza (Troncamento netto)
                     if (Math.abs(flight.alt - h) > (600 + wspd * 5)) localForce = 0;
 
-                    // 3. RENDERING FINALE
                     if (inWakeShadow) ctx.fillStyle = "rgba(100, 100, 100, 0.6)";
                     else if (localForce < -0.12) ctx.fillStyle = "rgba(231, 76, 60, 0.7)";
                     else if (localForce > 0.08) ctx.fillStyle = "rgba(46, 204, 113, 0.6)";
@@ -262,7 +271,6 @@
         }
     }
 
-    // Avvio
     init();
 </script>
 </body>
