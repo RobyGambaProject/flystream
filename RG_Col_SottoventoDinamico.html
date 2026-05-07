@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>RGproject_AI_FlyStreamV2.2_Hybrid</title>
+    <title>RGproject_AI_FlyStreamV2.3_Persistent</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -13,13 +13,8 @@
         
         /* --- MAPPA --- */
         #map { 
-            position: absolute; 
-            top: 50%; 
-            left: 50%; 
-            width: 220vmax; 
-            height: 220vmax; 
-            margin-top: -110vmax; 
-            margin-left: -110vmax; 
+            position: absolute; top: 50%; left: 50%; width: 220vmax; height: 220vmax; 
+            margin-top: -110vmax; margin-left: -110vmax; 
             transition: transform 0.1s linear, filter 0.3s ease; 
         }
         
@@ -32,51 +27,22 @@
         .label { font-size: 14px; font-weight: 800; color: #2980b9; display: block; text-transform: uppercase; }
         .val { font-size: 52px; font-weight: 900; color: #2c3e50; line-height: 1; }
 
-        /* --- PANNELLO CONFIGURAZIONE (CORRETTO) --- */
+        /* --- PANNELLO CONFIGURAZIONE --- */
         #config-panel {
-            position: absolute; 
-            top: 120px; /* REM: Spostato leggermente più in basso */
-            left: 10px; 
-            z-index: 3500; /* REM: Z-index elevato per stare sopra a tutto */
-            background: rgba(255, 255, 255, 0.95); 
-            padding: 12px; 
-            border-radius: 10px;
-            border: 2px solid #2c3e50; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            display: flex; 
-            flex-direction: column; 
-            gap: 12px; /* REM: Più spazio tra i controlli */
-            min-width: 180px;
+            position: absolute; top: 120px; left: 10px; z-index: 3500;
+            background: rgba(255, 255, 255, 0.95); padding: 12px; border-radius: 10px;
+            border: 2px solid #2c3e50; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            display: flex; flex-direction: column; gap: 12px; min-width: 180px;
         }
-        .ctrl-row { 
-            display: flex; 
-            align-items: center; 
-            gap: 10px; 
-            cursor: pointer;
-        }
-        .ctrl-row label {
-            font-weight: 900; 
-            font-size: 13px; 
-            color: #2c3e50;
-            pointer-events: none;
-        }
-        .ctrl-row input {
-            cursor: pointer;
-        }
+        .ctrl-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .ctrl-row label { font-weight: 900; font-size: 13px; color: #2c3e50; pointer-events: none; }
 
-        /* --- FRECCIA VENTO --- */
+        /* --- ALTRI ELEMENTI --- */
         #wind-box { position: absolute; top: 130px; right: 20px; z-index: 2500; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 50%; border: 2px solid #2c3e50; width: 65px; height: 65px; display: flex; align-items: center; justify-content: center; }
         #wind-arrow { width: 45px; height: 45px; transition: transform 0.2s linear; }
-        
-        /* --- ICONA PILOTA --- */
-        #pilot { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5000 !important; width: 35px; pointer-events: none; will-change: transform; }
+        #pilot { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5000 !important; width: 35px; pointer-events: none; }
         #agl-txt { color: #e67e22; }
-
-        #signature-box {
-            position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 4000;
-            background: rgba(255, 255, 255, 0.7); padding: 5px 15px; border-radius: 15px; border: 1px solid #2c3e50;
-            font-family: "Comic Sans MS", "Comic Sans", cursive; font-size: 14px; font-weight: bold; color: #2c3e50; white-space: nowrap;
-        }
+        #signature-box { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 4000; background: rgba(255, 255, 255, 0.7); padding: 5px 15px; border-radius: 15px; border: 1px solid #2c3e50; font-family: "Comic Sans MS", cursive; font-size: 14px; font-weight: bold; color: #2c3e50; }
     </style>
 </head>
 <body>
@@ -91,7 +57,7 @@
 
 <div id="config-panel">
     <div class="ctrl-row">
-        <input type="checkbox" id="chkDynamic" checked style="transform: scale(1.5);">
+        <input type="checkbox" id="chkDynamic" style="transform: scale(1.5);">
         <label for="chkDynamic">SCIA DINAMICA</label>
     </div>
     <div class="ctrl-row">
@@ -129,9 +95,12 @@
     let map         = null;      // REM: Oggetto Leaflet
     let canvas      = null;      // REM: Elemento DOM Canvas
     let ctx         = null;      // REM: Contesto grafico 2D
-    let isDynamic   = true;      // REM: Stato Scia (da checkbox)
-    let isBN        = false;     // REM: Stato Mappa BN (da checkbox)
+
+    // REM: Recupero stati persistenti da memoria browser per evitare reset checkbox
+    let isDynamic   = localStorage.getItem('isDynamic') !== 'false'; 
+    let isBN        = localStorage.getItem('isBN') === 'true';       
     
+    // REM: Oggetto Stato del Volo raggruppato
     let flight = { 
         lat: 44.8, lon: 9.1, hdg: 0, alt: 0, 
         speed: 0, windSpd: 0, windDir: 0 
@@ -139,6 +108,7 @@
 
     /* =========================================================================
        ROUTINE: init
+       INIZIALIZZAZIONE AMBIENTE E RIPRISTINO STATI
        ========================================================================= */
     function init() {
         canvas = document.getElementById('aeroCanvas');
@@ -147,15 +117,24 @@
         map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 13);
         L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
 
-        // Listener Scia Dinamica
-        document.getElementById('chkDynamic').addEventListener('change', (e) => isDynamic = e.target.checked);
+        // REM: Sincronizzazione visiva checkbox con variabili globali persistenti
+        document.getElementById('chkDynamic').checked = isDynamic;
+        document.getElementById('chkMapBN').checked = isBN;
 
-        // Listener Mappa BN
+        // REM: Listener per Scia Dinamica con salvataggio stato
+        document.getElementById('chkDynamic').addEventListener('change', (e) => {
+            isDynamic = e.target.checked;
+            localStorage.setItem('isDynamic', isDynamic);
+        });
+
+        // REM: Listener per Mappa BN con salvataggio stato
         document.getElementById('chkMapBN').addEventListener('change', (e) => {
             isBN = e.target.checked;
+            localStorage.setItem('isBN', isBN);
             applyMapStyle();
         });
 
+        applyMapStyle();
         window.onresize = resize;
         resize();
         setInterval(updateFromXCTrack, 500);
@@ -163,6 +142,7 @@
 
     /* =========================================================================
        ROUTINE: applyMapStyle
+       FORZA L'APPLICAZIONE DEI FILTRI CSS ALLA MAPPA
        ========================================================================= */
     function applyMapStyle() {
         let mapDiv = document.getElementById('map');
@@ -180,8 +160,10 @@
 
     /* =========================================================================
        ROUTINE: updateFromXCTrack
+       RECUPERA DATI GPS E CALCOLA IL VENTO (PUNTO A)
        ========================================================================= */
     function updateFromXCTrack() {
+        // --- VARIABILI LOCALI ---
         let xc, data, radH, radB, airX, airY, gndX, gndY, wX, wY, ws, wd;
 
         try {
@@ -216,11 +198,18 @@
 
     /* =========================================================================
        ROUTINE: updateView
+       GESTIONE PERSISTENZA MAPPA E CARICAMENTO JSON
        ========================================================================= */
     async function updateView() {
+        // --- VARIABILI LOCALI ---
         let tID, arrowRot;
+
         map.setView([flight.lat, flight.lon], 13, { animate: false });
         document.getElementById('map').style.transform = `rotate(${-flight.hdg}deg)`;
+        
+        // REM: Riapplica sempre lo stile per evitare reset durante il caricamento tile
+        applyMapStyle(); 
+
         document.getElementById('alt-txt').innerText = flight.alt;
         document.getElementById('spd-txt').innerText = flight.windSpd;
         
@@ -235,6 +224,7 @@
                     const json = await response.json();
                     terrainData = json.data;
                     currentTile = tID;
+                    applyMapStyle(); 
                 }
             } catch(e) { console.error("Errore fetch JSON:", e); }
         }
@@ -243,8 +233,10 @@
 
     /* =========================================================================
        ROUTINE: drawAnalysis
+       MOTORE OROGRAFICO CON LOGICA DINAMICA (PUNTO B/C)
        ========================================================================= */
     function drawAnalysis() {
+        // --- VARIABILI LOCALI ---
         let wspd, wdir, rad, vx, vy, res, rangeIdx, dropValue, maxSteps;
         let x, y, relX, relY, angleHdg, pLon, pLat, cx, cy, h;
         let inWakeShadow, d, lx, ly, gx, gy, localForce;
@@ -258,6 +250,7 @@
         vx   = -Math.cos(rad); vy = Math.sin(rad);
         res  = 6; rangeIdx = 0.045;
 
+        // REM: Calcolo estensione turbolenza basato su velocità vento se isDynamic=true
         if (isDynamic) {
             dropValue = Math.max(10, 50 - (wspd * 1.2)); 
             maxSteps  = wspd > 20 ? 12 : 6;              
@@ -287,6 +280,7 @@
                         ctx.fillRect(x, y, res, res); continue;
                     }
 
+                    // REM: Analisi ombra aerodinamica (Scia)
                     inWakeShadow = false;
                     for (d = 1; d <= maxSteps; d++) {
                         lx = Math.floor(((pLon - vx*0.00025*d) % 1) * PUNTI_PER_GRADO);
@@ -296,6 +290,7 @@
                         }
                     }
 
+                    // REM: Calcolo incidenza vento su pendenza terreno
                     gx = ((terrainData[cy][cx+1]||h)-(terrainData[cy][cx-1]||h))/(2*STEP_METRI);
                     gy = ((terrainData[cy+1]?terrainData[cy+1][cx]:h)-(terrainData[cy-1]?terrainData[cy-1][cx]:h))/(2*STEP_METRI);
                     localForce = (vx * gx + vy * gy) * (wspd / 10);
