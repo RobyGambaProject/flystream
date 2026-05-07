@@ -43,19 +43,10 @@
         #pilot { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5000 !important; width: 35px; pointer-events: none; }
         #agl-txt { color: #e67e22; }
         #signature-box { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 4000; background: rgba(255, 255, 255, 0.7); padding: 5px 15px; border-radius: 15px; border: 1px solid #2c3e50; font-family: "Comic Sans MS", cursive; font-size: 14px; font-weight: bold; color: #2c3e50; }
-
-        /* --- BOX VERSIONE (NUOVO) --- */
-        #version-box { 
-            position: absolute; top: 5px; right: 5px; z-index: 6000; 
-            background: rgba(44, 62, 80, 0.8); color: white; padding: 2px 6px; 
-            border-radius: 4px; font-size: 10px; font-weight: bold; font-family: monospace;
-            border: 1px solid rgba(255,255,255,0.3);
-        }
     </style>
 </head>
 <body>
 
-<div id="version-box">V.2.5</div>
 <div id="signature-box">RG Project - AI FlyStream</div>
 
 <div id="dashboard">
@@ -117,6 +108,7 @@
        ROUTINE: init
        ========================================================================= */
     function init() {
+        // REM: Variabili locali per caricamento memoria
         let savedDynamic, savedBN, cbDyn, cbBN;
 
         try {
@@ -238,8 +230,10 @@
 
     /* =========================================================================
        ROUTINE: drawAnalysis
+       LOGICA "CATTIVA": SCIA PIU' LUNGA E DECADIMENTO LENTO
        ========================================================================= */
     function drawAnalysis() {
+        // --- VARIABILI LOCALI ---
         let wspd, wdir, rad, vx, vy, res, rangeIdx, dropValue, maxSteps;
         let x, y, relX, relY, angleHdg, pLon, pLat, cx, cy, h;
         let inWakeShadow, d, lx, ly, gx, gy, localForce;
@@ -253,6 +247,8 @@
         vx   = -Math.cos(rad); vy = Math.sin(rad);
         res  = 6; rangeIdx = 0.045;
 
+        // REM: LOGICA AGGRESSIVA - dropValue parte da 40 e cala più lentamente (molt. 0.8)
+        // REM: maxSteps ora è dinamico e fluido: più vento = più profondità di calcolo
         if (isDynamic) {
             dropValue = Math.max(8, 40 - (wspd * 0.8)); 
             maxSteps  = Math.min(16, Math.floor(wspd / 1.5) + 4); 
