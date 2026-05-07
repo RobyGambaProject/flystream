@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>RGproject_AI_FlyStreamV2.1_Hybrid</title>
+    <title>RGproject_AI_FlyStreamV2.2_Hybrid</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -20,7 +20,7 @@
             height: 220vmax; 
             margin-top: -110vmax; 
             margin-left: -110vmax; 
-            transition: transform 0.1s linear, filter 0.3s ease; /* REM: Transizione fluida per il BN */
+            transition: transform 0.1s linear, filter 0.3s ease; 
         }
         
         /* --- CANVAS ANALISI OROGRAFICA --- */
@@ -32,14 +32,37 @@
         .label { font-size: 14px; font-weight: 800; color: #2980b9; display: block; text-transform: uppercase; }
         .val { font-size: 52px; font-weight: 900; color: #2c3e50; line-height: 1; }
 
-        /* --- PANNELLO CONFIGURAZIONE --- */
+        /* --- PANNELLO CONFIGURAZIONE (CORRETTO) --- */
         #config-panel {
-            position: absolute; top: 115px; left: 10px; z-index: 3000;
-            background: rgba(255, 255, 255, 0.9); padding: 10px; border-radius: 8px;
-            border: 1px solid #2c3e50; font-weight: bold; font-size: 12px; 
-            display: flex; flex-direction: column; gap: 8px;
+            position: absolute; 
+            top: 120px; /* REM: Spostato leggermente più in basso */
+            left: 10px; 
+            z-index: 3500; /* REM: Z-index elevato per stare sopra a tutto */
+            background: rgba(255, 255, 255, 0.95); 
+            padding: 12px; 
+            border-radius: 10px;
+            border: 2px solid #2c3e50; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            display: flex; 
+            flex-direction: column; 
+            gap: 12px; /* REM: Più spazio tra i controlli */
+            min-width: 180px;
         }
-        .ctrl-row { display: flex; align-items: center; gap: 8px; }
+        .ctrl-row { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            cursor: pointer;
+        }
+        .ctrl-row label {
+            font-weight: 900; 
+            font-size: 13px; 
+            color: #2c3e50;
+            pointer-events: none;
+        }
+        .ctrl-row input {
+            cursor: pointer;
+        }
 
         /* --- FRECCIA VENTO --- */
         #wind-box { position: absolute; top: 130px; right: 20px; z-index: 2500; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 50%; border: 2px solid #2c3e50; width: 65px; height: 65px; display: flex; align-items: center; justify-content: center; }
@@ -68,11 +91,11 @@
 
 <div id="config-panel">
     <div class="ctrl-row">
-        <input type="checkbox" id="chkDynamic" checked style="transform: scale(1.3);">
+        <input type="checkbox" id="chkDynamic" checked style="transform: scale(1.5);">
         <label for="chkDynamic">SCIA DINAMICA</label>
     </div>
     <div class="ctrl-row">
-        <input type="checkbox" id="chkMapBN" style="transform: scale(1.3);">
+        <input type="checkbox" id="chkMapBN" style="transform: scale(1.5);">
         <label for="chkMapBN">MAPPA B/N (ISOIPSE)</label>
     </div>
 </div>
@@ -109,7 +132,6 @@
     let isDynamic   = true;      // REM: Stato Scia (da checkbox)
     let isBN        = false;     // REM: Stato Mappa BN (da checkbox)
     
-    // Oggetto Stato del Volo
     let flight = { 
         lat: 44.8, lon: 9.1, hdg: 0, alt: 0, 
         speed: 0, windSpd: 0, windDir: 0 
@@ -123,17 +145,13 @@
         ctx = canvas.getContext('2d');
         
         map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 13);
-        
-        // Layer base OpenTopoMap
         L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
 
-        // Listener Checkbox 1: Scia Dinamica
-        document.getElementById('chkDynamic').addEventListener('change', function(e) {
-            isDynamic = e.target.checked;
-        });
+        // Listener Scia Dinamica
+        document.getElementById('chkDynamic').addEventListener('change', (e) => isDynamic = e.target.checked);
 
-        // Listener Checkbox 2: Mappa BN
-        document.getElementById('chkMapBN').addEventListener('change', function(e) {
+        // Listener Mappa BN
+        document.getElementById('chkMapBN').addEventListener('change', (e) => {
             isBN = e.target.checked;
             applyMapStyle();
         });
@@ -145,15 +163,12 @@
 
     /* =========================================================================
        ROUTINE: applyMapStyle
-       GESTISCE I FILTRI VISIVI PER IL PASSAGGIO A BN
        ========================================================================= */
     function applyMapStyle() {
         let mapDiv = document.getElementById('map');
         if (isBN) {
-            // REM: Applica filtri per scurire isoipse e togliere colori mappa
             mapDiv.style.filter = "grayscale(1) contrast(1.8) brightness(0.9) opacity(0.8)";
         } else {
-            // REM: Ripristina mappa colori originale
             mapDiv.style.filter = "none";
         }
     }
@@ -164,7 +179,7 @@
     }
 
     /* =========================================================================
-       ROUTINE: updateFromXCTrack (Dati XCTrack + Calcolo Vento)
+       ROUTINE: updateFromXCTrack
        ========================================================================= */
     function updateFromXCTrack() {
         let xc, data, radH, radB, airX, airY, gndX, gndY, wX, wY, ws, wd;
@@ -200,7 +215,7 @@
     }
 
     /* =========================================================================
-       ROUTINE: updateView (Aggiornamento Mappa e Check Tile)
+       ROUTINE: updateView
        ========================================================================= */
     async function updateView() {
         let tID, arrowRot;
@@ -227,7 +242,7 @@
     }
 
     /* =========================================================================
-       ROUTINE: drawAnalysis (Motore di Rendering Oroografico)
+       ROUTINE: drawAnalysis
        ========================================================================= */
     function drawAnalysis() {
         let wspd, wdir, rad, vx, vy, res, rangeIdx, dropValue, maxSteps;
@@ -243,7 +258,6 @@
         vx   = -Math.cos(rad); vy = Math.sin(rad);
         res  = 6; rangeIdx = 0.045;
 
-        // REM: Applica logica Dynamic Wake definita nel manuale tecnico
         if (isDynamic) {
             dropValue = Math.max(10, 50 - (wspd * 1.2)); 
             maxSteps  = wspd > 20 ? 12 : 6;              
