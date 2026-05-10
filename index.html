@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>RGproject_AI_FlyStreamV2.5.5</title>
+    <title>RGproject_AI_FlyStreamV2.5.6</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -29,20 +29,10 @@
 
         /* --- FEEDBACK ZOOM DASHBOARD --- */
         #zoom-feedback {
-            position: absolute; 
-            bottom: -22px; 
-            right: 10px; 
-            background: #2c3e50; 
-            color: white; 
-            padding: 2px 15px; 
-            border-radius: 0 0 8px 8px;
-            font-size: 11px; 
-            font-weight: bold; 
-            text-transform: uppercase; 
-            letter-spacing: 1px;
-            transition: background 0.3s ease; 
-            border: 1px solid #2c3e50; 
-            border-top: none;
+            position: absolute; bottom: -22px; right: 10px; 
+            background: #2c3e50; color: white; padding: 2px 15px; border-radius: 0 0 8px 8px;
+            font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+            transition: background 0.3s ease; border: 1px solid #2c3e50; border-top: none;
         }
 
         /* --- PANNELLO CONFIGURAZIONE --- */
@@ -53,7 +43,7 @@
             display: flex; flex-direction: column; gap: 12px; min-width: 180px;
         }
 
-        /* --- ELEMENTO FIRMA + VERSIONE UNIFICATO --- */
+        /* --- ELEMENTO FIRMA + VERSIONE --- */
         #signature-box { 
             position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); 
             z-index: 4000; background: rgba(255, 255, 255, 0.85); padding: 6px 18px; 
@@ -70,6 +60,17 @@
             display: flex; align-items: center; justify-content: center; 
             cursor: pointer; transition: transform 0.1s ease;
         }
+        
+        /* REM: Box gradi vento sotto l'indicatore */
+        #wind-deg-box {
+            position: absolute; top: 202px; right: 20px; z-index: 2500;
+            background: rgba(44, 62, 80, 0.7); color: white;
+            width: 65px; text-align: center; border-radius: 5px;
+            font-family: monospace; font-weight: bold; font-size: 14px;
+            padding: 2px 0; border: 1px solid rgba(255,255,255,0.3);
+            pointer-events: none;
+        }
+
         #wind-box:active { transform: scale(0.9); }
         #wind-arrow { width: 45px; height: 45px; transition: transform 0.2s linear; }
         #pilot { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5000 !important; width: 35px; pointer-events: none; }
@@ -81,7 +82,7 @@
 <body>
 
 <div id="signature-box">
-    RG Project - AI FlyStream <span class="ver-span">V.2.5.5</span>
+    RG Project - AI FlyStream <span class="ver-span">V.2.5.6</span>
 </div>
 
 <div id="dashboard">
@@ -108,6 +109,7 @@
         <polyline points="5 12 12 5 19 12"></polyline>
     </svg>
 </div>
+<div id="wind-deg-box"><span id="wind-val">0</span>°</div>
 
 <svg id="pilot" viewBox="0 0 24 24" fill="#3498db" stroke="white" stroke-width="1.5">
     <path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z"/>
@@ -127,7 +129,7 @@
     let ctx = null;
     let isDynamic = true;
     let isBN = false;
-    let isTacticMode = false; // Stato Zoom (false = 12 Strategico, true = 14.6 Tattico)
+    let isTacticMode = false;
     let flight = { lat: 44.8, lon: 9.1, hdg: 0, alt: 0, speed: 0, windSpd: 0, windDir: 0 };
 
     /* --- ROUTINE: INIZIALIZZAZIONE APP --- */
@@ -143,7 +145,6 @@
         canvas = document.getElementById('aeroCanvas');
         ctx = canvas.getContext('2d');
 
-        // Partenza obbligatoria in modalità STRATEGICA (Zoom 12)
         map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 12);
         L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
 
@@ -170,16 +171,9 @@
         const targetZoom = isTacticMode ? 14.6 : 12;
         const statusTxt = document.getElementById('zoom-status');
         const feedbackBox = document.getElementById('zoom-feedback');
-        
         map.setZoom(targetZoom, { animate: true });
-        
-        if (isTacticMode) {
-            statusTxt.innerText = "TATTICA";
-            feedbackBox.style.background = "#e67e22"; 
-        } else {
-            statusTxt.innerText = "STRATEGICA";
-            feedbackBox.style.background = "#2c3e50"; 
-        }
+        if (isTacticMode) { statusTxt.innerText = "TATTICA"; feedbackBox.style.background = "#e67e22"; }
+        else { statusTxt.innerText = "STRATEGICA"; feedbackBox.style.background = "#2c3e50"; }
     }
 
     /* --- ROUTINE: STILE MAPPA --- */
@@ -201,17 +195,14 @@
             xc = window.XCTrack || (window.parent && window.parent.XCTrack);
             if (xc && typeof xc.getLocation === 'function') {
                 data = JSON.parse(xc.getLocation());
-                flight.lat = Number(data.lat);
-                flight.lon = Number(data.lon);
+                flight.lat = Number(data.lat); flight.lon = Number(data.lon);
                 flight.alt = Math.round(Number(data.altGps));
                 flight.hdg = Number(data.heading || 0);
                 if (data.airspeed > 0) {
                     radH = Number(data.heading) * Math.PI / 180;
                     radB = Number(data.bearingGps) * Math.PI / 180;
-                    airX = Number(data.airspeed) * Math.sin(radH);
-                    airY = Number(data.airspeed) * Math.cos(radH);
-                    gndX = Number(data.speedGps) * Math.sin(radB);
-                    gndY = Number(data.speedGps) * Math.cos(radB);
+                    airX = Number(data.airspeed) * Math.sin(radH); airY = Number(data.airspeed) * Math.cos(radH);
+                    gndX = Number(data.speedGps) * Math.sin(radB); gndY = Number(data.speedGps) * Math.cos(radB);
                     wX = gndX - airX; wY = gndY - airY;
                     flight.windSpd = Math.round(Math.sqrt(wX*wX + wY*wY) * 3.6);
                     flight.windDir = Math.round((Math.atan2(wX, wY) * 180 / Math.PI + 180) % 360);
@@ -226,15 +217,19 @@
         } catch (e) {}
     }
 
-    /* --- ROUTINE: AGGIORNAMENTO VISTA E CARICAMENTO TILE --- */
+    /* --- ROUTINE: AGGIORNAMENTO VISTA --- */
     async function updateView() {
         let tID, arrowRot, response, json;
         map.setView([flight.lat, flight.lon], map.getZoom(), { animate: false });
         document.getElementById('map').style.transform = `rotate(${-flight.hdg}deg)`;
         document.getElementById('alt-txt').innerText = flight.alt;
         document.getElementById('spd-txt').innerText = flight.windSpd;
+        
+        // REM: Aggiornamento freccia e valore numerico gradi
         arrowRot = (flight.windDir - flight.hdg) + 180;
         document.getElementById('wind-arrow').style.transform = `rotate(${arrowRot}deg)`;
+        document.getElementById('wind-val').innerText = Math.round(flight.windDir);
+
         tID = `map_${Math.floor(flight.lat)}_${Math.floor(flight.lon)}`;
         if (currentTile !== tID) {
             try {
@@ -249,19 +244,17 @@
         drawAnalysis();
     }
 
-    /* --- ROUTINE: CALCOLO E DISEGNO ANALISI (LIFT/SINK/WAKE) --- */
+    /* --- ROUTINE: CALCOLO E DISEGNO ANALISI --- */
     function drawAnalysis() {
         let wspd, wdir, rad, vx, vy, res, rangeIdx, dropValue, maxSteps;
         let x, y, relX, relY, angleHdg, pLon, pLat, cx, cy, h;
         let inWakeShadow, d, lx, ly, gx, gy, localForce;
         if (!terrainData) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        wspd = flight.windSpd;
-        wdir = flight.windDir;
+        wspd = flight.windSpd; wdir = flight.windDir;
         rad = (wdir - 90) * (Math.PI / 180);
         vx = -Math.cos(rad); vy = Math.sin(rad);
 
-        // REM: CORREZIONE RANGE DINAMICO PER SINCRO ZOOM (V.2.5.5)
         res = 6; 
         rangeIdx = 0.045 / Math.pow(2, (map.getZoom() - 12));
 
@@ -269,8 +262,7 @@
             dropValue = Math.max(8, 40 - (wspd * 0.8)); 
             maxSteps = Math.min(16, Math.floor(wspd / 1.5) + 4); 
         } else {
-            dropValue = 35; 
-            maxSteps = 6;
+            dropValue = 35; maxSteps = 6;
         }
         for (x = 0; x < canvas.width; x += res) {
             for (y = 0; y < canvas.height; y += res) {
