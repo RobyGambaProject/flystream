@@ -27,12 +27,23 @@
         .label { font-size: 14px; font-weight: 800; color: #2980b9; display: block; text-transform: uppercase; }
         .val { font-size: 52px; font-weight: 900; color: #2c3e50; line-height: 1; }
 
-        /* --- FEEDBACK ZOOM DASHBOARD --- */
+/* --- FEEDBACK ZOOM DASHBOARD --- */
         #zoom-feedback {
-            position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%);
-            background: #2c3e50; color: white; padding: 2px 15px; border-radius: 0 0 8px 8px;
-            font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
-            transition: background 0.3s ease; border: 1px solid #2c3e50; border-top: none;
+            position: absolute; 
+            bottom: -22px; 
+            right: 10px; /* Ancoraggio a destra con piccolo margine */
+            /* Rimosso left e transform per annullare la centratura */
+            background: #2c3e50; 
+            color: white; 
+            padding: 2px 15px; 
+            border-radius: 0 0 8px 8px;
+            font-size: 11px; 
+            font-weight: bold; 
+            text-transform: uppercase; 
+            letter-spacing: 1px;
+            transition: background 0.3s ease; 
+            border: 1px solid #2c3e50; 
+            border-top: none;
         }
 
         /* --- PANNELLO CONFIGURAZIONE --- */
@@ -117,7 +128,7 @@
     let ctx = null;
     let isDynamic = true;
     let isBN = false;
-    let isTacticMode = false; // Stato dello Zoom (false = Strategico 13, true = Tattico 14.6)
+    let isTacticMode = false; // Stato dello Zoom (false = Strategico 12, true = Tattico 14.6)
     let flight = { lat: 44.8, lon: 9.1, hdg: 0, alt: 0, speed: 0, windSpd: 0, windDir: 0 };
 
     /* --- ROUTINE: INIZIALIZZAZIONE APP --- */
@@ -133,7 +144,7 @@
         canvas = document.getElementById('aeroCanvas');
         ctx = canvas.getContext('2d');
 
-        // Partenza obbligatoria in modalità STRATEGICA (Zoom 13)
+        // Partenza obbligatoria in modalità STRATEGICA (Zoom 12)
         map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 12);
         L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
 
