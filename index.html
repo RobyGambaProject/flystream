@@ -134,7 +134,7 @@
         ctx = canvas.getContext('2d');
 
         // Partenza obbligatoria in modalità STRATEGICA (Zoom 13)
-        map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 13);
+        map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 12);
         L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
 
         // REM: Gestione Click sul Vento per Flip-Flop Zoom
@@ -158,7 +158,7 @@
     /* --- ROUTINE: GESTIONE FLIP-FLOP ZOOM --- */
     function toggleZoom() {
         isTacticMode = !isTacticMode;
-        const targetZoom = isTacticMode ? 14.6 : 13;
+        const targetZoom = isTacticMode ? 14.6 : 12;
         const statusTxt = document.getElementById('zoom-status');
         const feedbackBox = document.getElementById('zoom-feedback');
         
