@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>RGproject_AI_FlyStreamV2.5.4</title>
+    <title>RGproject_AI_FlyStreamV2.5.5</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -27,23 +27,12 @@
         .label { font-size: 14px; font-weight: 800; color: #2980b9; display: block; text-transform: uppercase; }
         .val { font-size: 52px; font-weight: 900; color: #2c3e50; line-height: 1; }
 
-/* --- FEEDBACK ZOOM DASHBOARD --- */
+        /* --- FEEDBACK ZOOM DASHBOARD --- */
         #zoom-feedback {
-            position: absolute; 
-            bottom: -22px; 
-            right: 10px; /* Ancoraggio a destra con piccolo margine */
-            /* Rimosso left e transform per annullare la centratura */
-            background: #2c3e50; 
-            color: white; 
-            padding: 2px 15px; 
-            border-radius: 0 0 8px 8px;
-            font-size: 11px; 
-            font-weight: bold; 
-            text-transform: uppercase; 
-            letter-spacing: 1px;
-            transition: background 0.3s ease; 
-            border: 1px solid #2c3e50; 
-            border-top: none;
+            position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%);
+            background: #2c3e50; color: white; padding: 2px 15px; border-radius: 0 0 8px 8px;
+            font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+            transition: background 0.3s ease; border: 1px solid #2c3e50; border-top: none;
         }
 
         /* --- PANNELLO CONFIGURAZIONE --- */
@@ -54,7 +43,7 @@
             display: flex; flex-direction: column; gap: 12px; min-width: 180px;
         }
 
-        /* --- ELEMENTO FIRMA + VERSIONE UNIFICATO --- */
+        /* --- ELEMENTO FIRMA + VERSIONE --- */
         #signature-box { 
             position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); 
             z-index: 4000; background: rgba(255, 255, 255, 0.85); padding: 6px 18px; 
@@ -71,7 +60,7 @@
             display: flex; align-items: center; justify-content: center; 
             cursor: pointer; transition: transform 0.1s ease;
         }
-        #wind-box:active { transform: scale(0.9); }
+        #wind-box:active { transform: scale(0.9); background: rgba(230, 126, 34, 0.2); }
         #wind-arrow { width: 45px; height: 45px; transition: transform 0.2s linear; }
         #pilot { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5000 !important; width: 35px; pointer-events: none; }
         #agl-txt { color: #e67e22; }
@@ -103,7 +92,7 @@
     </div>
 </div>
 
-<div id="wind-box" title="Clicca per zoom Tattico/Strategico">
+<div id="wind-box" title="Clicca per Flip-Flop Zoom Tattico/Strategico">
     <svg id="wind-arrow" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
         <line x1="12" y1="19" x2="12" y2="5"></line>
         <polyline points="5 12 12 5 19 12"></polyline>
@@ -128,7 +117,7 @@
     let ctx = null;
     let isDynamic = true;
     let isBN = false;
-    let isTacticMode = false; // Stato dello Zoom (false = Strategico 12, true = Tattico 14.6)
+    let isTacticMode = false; // REM: false = Zoom 13 (Strategico), true = Zoom 14.6 (Tattico)
     let flight = { lat: 44.8, lon: 9.1, hdg: 0, alt: 0, speed: 0, windSpd: 0, windDir: 0 };
 
     /* --- ROUTINE: INIZIALIZZAZIONE APP --- */
@@ -144,11 +133,11 @@
         canvas = document.getElementById('aeroCanvas');
         ctx = canvas.getContext('2d');
 
-        // Partenza obbligatoria in modalità STRATEGICA (Zoom 12)
-        map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 12);
+        // REM: Inizializzazione mappa con Zoom Strategico (13)
+        map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 13);
         L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
 
-        // REM: Gestione Click sul Vento per Flip-Flop Zoom
+        // REM: Listener per il Flip-Flop dello Zoom tramite click sull'indicatore del vento
         const windBtn = document.getElementById('wind-box');
         windBtn.addEventListener('click', toggleZoom);
         windBtn.addEventListener('touchstart', (e) => { e.preventDefault(); toggleZoom(); });
@@ -169,18 +158,19 @@
     /* --- ROUTINE: GESTIONE FLIP-FLOP ZOOM --- */
     function toggleZoom() {
         isTacticMode = !isTacticMode;
-        const targetZoom = isTacticMode ? 14.6 : 12;
+        const targetZoom = isTacticMode ? 14.6 : 13;
         const statusTxt = document.getElementById('zoom-status');
         const feedbackBox = document.getElementById('zoom-feedback');
         
+        // REM: Cambio zoom con animazione per mantenere il riferimento spaziale
         map.setZoom(targetZoom, { animate: true });
         
         if (isTacticMode) {
             statusTxt.innerText = "TATTICA";
-            feedbackBox.style.background = "#e67e22"; // Arancione
+            feedbackBox.style.background = "#e67e22"; // Arancione per fase tattica
         } else {
             statusTxt.innerText = "STRATEGICA";
-            feedbackBox.style.background = "#2c3e50"; // Blu
+            feedbackBox.style.background = "#2c3e50"; // Blu per fase panoramica
         }
     }
 
@@ -256,13 +246,21 @@
         let wspd, wdir, rad, vx, vy, res, rangeIdx, dropValue, maxSteps;
         let x, y, relX, relY, angleHdg, pLon, pLat, cx, cy, h;
         let inWakeShadow, d, lx, ly, gx, gy, localForce;
+        
         if (!terrainData) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
         wspd = flight.windSpd;
         wdir = flight.windDir;
         rad = (wdir - 90) * (Math.PI / 180);
         vx = -Math.cos(rad); vy = Math.sin(rad);
-        res = 6; rangeIdx = 0.045;
+
+        // REM: Sincronizzazione dinamica del layer orografico con lo Zoom di Leaflet
+        // Calcoliamo la risoluzione (res) e l'indice di ampiezza (rangeIdx) in base allo zoom attuale
+        let currentZoom = map.getZoom();
+        res = (currentZoom > 14) ? 4 : 6; // REM: Aumentiamo la densità pixel in modalità tattica
+        rangeIdx = 0.045 / Math.pow(2, (currentZoom - 13)); 
+
         if (isDynamic) {
             dropValue = Math.max(8, 40 - (wspd * 0.8)); 
             maxSteps = Math.min(16, Math.floor(wspd / 1.5) + 4); 
@@ -270,6 +268,7 @@
             dropValue = 35; 
             maxSteps = 6;
         }
+
         for (x = 0; x < canvas.width; x += res) {
             for (y = 0; y < canvas.height; y += res) {
                 relX = (x - canvas.width / 2) / (canvas.width / 2) * rangeIdx;
@@ -279,6 +278,7 @@
                 pLat = flight.lat + (relX * Math.sin(angleHdg) + relY * Math.cos(angleHdg));
                 cx = Math.floor((pLon % 1) * PUNTI_PER_GRADO);
                 cy = (PUNTI_PER_GRADO - 1) - Math.floor((pLat % 1) * PUNTI_PER_GRADO);
+                
                 if (terrainData[cy] && terrainData[cy][cx]) {
                     h = terrainData[cy][cx];
                     if (Math.abs(x - canvas.width/2) < res && Math.abs(y - canvas.height/2) < res) {
@@ -300,6 +300,7 @@
                     gy = ((terrainData[cy+1]?terrainData[cy+1][cx]:h)-(terrainData[cy-1]?terrainData[cy-1][cx]:h))/(2*STEP_METRI);
                     localForce = (vx * gx + vy * gy) * (wspd / 10);
                     if (Math.abs(flight.alt - h) > (600 + wspd * 5)) localForce = 0;
+                    
                     if (inWakeShadow) ctx.fillStyle = "rgba(100, 100, 100, 0.6)";
                     else if (localForce < -0.12) ctx.fillStyle = "rgba(231, 76, 60, 0.7)";
                     else if (localForce > 0.08) ctx.fillStyle = "rgba(46, 204, 113, 0.6)";
