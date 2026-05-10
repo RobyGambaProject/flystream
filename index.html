@@ -184,4 +184,134 @@
 
     /* --- ROUTINE: STILE MAPPA --- */
     function applyMapStyle() {
-        let mapDiv = document.getElementById('
+        let mapDiv = document.getElementById('map');
+        mapDiv.style.filter = isBN ? "grayscale(1) contrast(1.8) brightness(0.9) opacity(0.8)" : "none";
+    }
+
+    /* --- ROUTINE: RESIZE CANVAS --- */
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+
+    /* --- ROUTINE: ACQUISIZIONE DATI XCTRACK --- */
+    function updateFromXCTrack() {
+        let xc, data, radH, radB, airX, airY, gndX, gndY, wX, wY, ws, wd;
+        try {
+            xc = window.XCTrack || (window.parent && window.parent.XCTrack);
+            if (xc && typeof xc.getLocation === 'function') {
+                data = JSON.parse(xc.getLocation());
+                flight.lat = Number(data.lat);
+                flight.lon = Number(data.lon);
+                flight.alt = Math.round(Number(data.altGps));
+                flight.hdg = Number(data.heading || 0);
+                if (data.airspeed > 0) {
+                    radH = Number(data.heading) * Math.PI / 180;
+                    radB = Number(data.bearingGps) * Math.PI / 180;
+                    airX = Number(data.airspeed) * Math.sin(radH);
+                    airY = Number(data.airspeed) * Math.cos(radH);
+                    gndX = Number(data.speedGps) * Math.sin(radB);
+                    gndY = Number(data.speedGps) * Math.cos(radB);
+                    wX = gndX - airX; wY = gndY - airY;
+                    flight.windSpd = Math.round(Math.sqrt(wX*wX + wY*wY) * 3.6);
+                    flight.windDir = Math.round((Math.atan2(wX, wY) * 180 / Math.PI + 180) % 360);
+                } else {
+                    ws = data.windSpeed || (data.wind ? data.wind.speed : 0);
+                    wd = data.windDirection || (data.wind ? data.wind.direction : 0);
+                    flight.windSpd = data.wind ? Math.round(Number(ws)) : Math.round(Number(ws) * 3.6);
+                    flight.windDir = Number(wd);
+                }
+                updateView();
+            }
+        } catch (e) {}
+    }
+
+    /* --- ROUTINE: AGGIORNAMENTO VISTA E CARICAMENTO TILE --- */
+    async function updateView() {
+        let tID, arrowRot, response, json;
+        map.setView([flight.lat, flight.lon], map.getZoom(), { animate: false });
+        document.getElementById('map').style.transform = `rotate(${-flight.hdg}deg)`;
+        document.getElementById('alt-txt').innerText = flight.alt;
+        document.getElementById('spd-txt').innerText = flight.windSpd;
+        arrowRot = (flight.windDir - flight.hdg) + 180;
+        document.getElementById('wind-arrow').style.transform = `rotate(${arrowRot}deg)`;
+        tID = `map_${Math.floor(flight.lat)}_${Math.floor(flight.lon)}`;
+        if (currentTile !== tID) {
+            try {
+                response = await fetch(`data_json/${tID}.json`);
+                if (response.ok) {
+                    json = await response.json();
+                    terrainData = json.data;
+                    currentTile = tID;
+                }
+            } catch(e) {}
+        }
+        drawAnalysis();
+    }
+
+    /* --- ROUTINE: CALCOLO E DISEGNO ANALISI (LIFT/SINK/WAKE) --- */
+    function drawAnalysis() {
+        let wspd, wdir, rad, vx, vy, res, rangeIdx, dropValue, maxSteps;
+        let x, y, relX, relY, angleHdg, pLon, pLat, cx, cy, h;
+        let inWakeShadow, d, lx, ly, gx, gy, localForce;
+        if (!terrainData) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        wspd = flight.windSpd;
+        wdir = flight.windDir;
+        rad = (wdir - 90) * (Math.PI / 180);
+        vx = -Math.cos(rad); vy = Math.sin(rad);
+
+        // REM: CORREZIONE RANGE DINAMICO PER SINCRO ZOOM (V.2.5.5)
+        res = 6; 
+        rangeIdx = 0.045 / Math.pow(2, (map.getZoom() - 12));
+
+        if (isDynamic) {
+            dropValue = Math.max(8, 40 - (wspd * 0.8)); 
+            maxSteps = Math.min(16, Math.floor(wspd / 1.5) + 4); 
+        } else {
+            dropValue = 35; 
+            maxSteps = 6;
+        }
+        for (x = 0; x < canvas.width; x += res) {
+            for (y = 0; y < canvas.height; y += res) {
+                relX = (x - canvas.width / 2) / (canvas.width / 2) * rangeIdx;
+                relY = -(y - canvas.height / 2) / (canvas.height / 2) * rangeIdx;
+                angleHdg = -flight.hdg * (Math.PI / 180);
+                pLon = flight.lon + (relX * Math.cos(angleHdg) - relY * Math.sin(angleHdg));
+                pLat = flight.lat + (relX * Math.sin(angleHdg) + relY * Math.cos(angleHdg));
+                cx = Math.floor((pLon % 1) * PUNTI_PER_GRADO);
+                cy = (PUNTI_PER_GRADO - 1) - Math.floor((pLat % 1) * PUNTI_PER_GRADO);
+                if (terrainData[cy] && terrainData[cy][cx]) {
+                    h = terrainData[cy][cx];
+                    if (Math.abs(x - canvas.width/2) < res && Math.abs(y - canvas.height/2) < res) {
+                        document.getElementById('agl-txt').innerText = Math.round(flight.alt - h);
+                    }
+                    if (h >= flight.alt) {
+                        ctx.fillStyle = "rgba(40, 40, 40, 0.8)";
+                        ctx.fillRect(x, y, res, res); continue;
+                    }
+                    inWakeShadow = false;
+                    for (d = 1; d <= maxSteps; d++) {
+                        lx = Math.floor(((pLon - vx*0.00025*d) % 1) * PUNTI_PER_GRADO);
+                        ly = (PUNTI_PER_GRADO-1) - Math.floor(((pLat - vy*0.00025*d) % 1) * PUNTI_PER_GRADO);
+                        if (terrainData[ly] && terrainData[ly][lx] > (flight.alt - (d * dropValue))) { 
+                            inWakeShadow = true; break; 
+                        }
+                    }
+                    gx = ((terrainData[cy][cx+1]||h)-(terrainData[cy][cx-1]||h))/(2*STEP_METRI);
+                    gy = ((terrainData[cy+1]?terrainData[cy+1][cx]:h)-(terrainData[cy-1]?terrainData[cy-1][cx]:h))/(2*STEP_METRI);
+                    localForce = (vx * gx + vy * gy) * (wspd / 10);
+                    if (Math.abs(flight.alt - h) > (600 + wspd * 5)) localForce = 0;
+                    if (inWakeShadow) ctx.fillStyle = "rgba(100, 100, 100, 0.6)";
+                    else if (localForce < -0.12) ctx.fillStyle = "rgba(231, 76, 60, 0.7)";
+                    else if (localForce > 0.08) ctx.fillStyle = "rgba(46, 204, 113, 0.6)";
+                    else ctx.fillStyle = "rgba(0,0,0,0)";
+                    ctx.fillRect(x, y, res, res);
+                }
+            }
+        }
+    }
+    init();
+</script>
+</body>
+</html>
