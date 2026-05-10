@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>RGproject_AI_FlyStreamV2.5.3</title>
+    <title>RGproject_AI_FlyStreamV2.5.4</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -27,6 +27,14 @@
         .label { font-size: 14px; font-weight: 800; color: #2980b9; display: block; text-transform: uppercase; }
         .val { font-size: 52px; font-weight: 900; color: #2c3e50; line-height: 1; }
 
+        /* --- FEEDBACK ZOOM DASHBOARD --- */
+        #zoom-feedback {
+            position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%);
+            background: #2c3e50; color: white; padding: 2px 15px; border-radius: 0 0 8px 8px;
+            font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;
+            transition: background 0.3s ease; border: 1px solid #2c3e50; border-top: none;
+        }
+
         /* --- PANNELLO CONFIGURAZIONE --- */
         #config-panel {
             position: absolute; top: 120px; left: 10px; z-index: 3500;
@@ -37,37 +45,22 @@
 
         /* --- ELEMENTO FIRMA + VERSIONE UNIFICATO --- */
         #signature-box { 
-            position: absolute; 
-            bottom: 15px; 
-            left: 50%; 
-            transform: translateX(-50%); 
-            z-index: 4000; 
-            background: rgba(255, 255, 255, 0.85); 
-            padding: 6px 18px; 
-            border-radius: 20px; 
-            border: 1.5px solid #2c3e50; 
-            font-family: "Comic Sans MS", cursive; 
-            font-size: 14px; 
-            font-weight: bold; 
-            color: #2c3e50;
-            white-space: nowrap;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); 
+            z-index: 4000; background: rgba(255, 255, 255, 0.85); padding: 6px 18px; 
+            border-radius: 20px; border: 1.5px solid #2c3e50; font-family: "Comic Sans MS", cursive; 
+            font-size: 14px; font-weight: bold; color: #2c3e50; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
         }
-        
-        /* REM: Stile specifico per la versione dentro la firma */
-        .ver-span {
-            font-family: monospace;
-            font-size: 11px;
-            background: #2c3e50;
-            color: white;
-            padding: 1px 6px;
-            border-radius: 4px;
-            margin-left: 8px;
-            vertical-align: middle;
-        }
+        .ver-span { font-family: monospace; font-size: 11px; background: #2c3e50; color: white; padding: 1px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; }
 
-        /* --- ALTRI ELEMENTI --- */
-        #wind-box { position: absolute; top: 130px; right: 20px; z-index: 2500; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 50%; border: 2px solid #2c3e50; width: 65px; height: 65px; display: flex; align-items: center; justify-content: center; }
+        /* --- ELEMENTI INTERATTIVI --- */
+        #wind-box { 
+            position: absolute; top: 130px; right: 20px; z-index: 2500; 
+            background: rgba(255,255,255,0.9); padding: 8px; border-radius: 50%; 
+            border: 2px solid #2c3e50; width: 65px; height: 65px; 
+            display: flex; align-items: center; justify-content: center; 
+            cursor: pointer; transition: transform 0.1s ease;
+        }
+        #wind-box:active { transform: scale(0.9); }
         #wind-arrow { width: 45px; height: 45px; transition: transform 0.2s linear; }
         #pilot { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5000 !important; width: 35px; pointer-events: none; }
         #agl-txt { color: #e67e22; }
@@ -78,13 +71,14 @@
 <body>
 
 <div id="signature-box">
-    RG Project - AI FlyStream <span class="ver-span">V.2.5.3</span>
+    RG Project - AI FlyStream <span class="ver-span">V.2.5.4</span>
 </div>
 
 <div id="dashboard">
     <div class="box"><span class="label">Quota (m)</span><span id="alt-txt" class="val">---</span></div>
     <div class="box"><span class="label">Vento (km/h)</span><span id="spd-txt" class="val">---</span></div>
     <div class="box"><span class="label">AGL (m)</span><span id="agl-txt" class="val">---</span></div>
+    <div id="zoom-feedback">MODE: <span id="zoom-status">STRATEGICA</span></div>
 </div>
 
 <div id="config-panel">
@@ -98,7 +92,7 @@
     </div>
 </div>
 
-<div id="wind-box">
+<div id="wind-box" title="Clicca per zoom Tattico/Strategico">
     <svg id="wind-arrow" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
         <line x1="12" y1="19" x2="12" y2="5"></line>
         <polyline points="5 12 12 5 19 12"></polyline>
@@ -113,7 +107,7 @@
 <canvas id="aeroCanvas"></canvas>
 
 <script>
-    // [LOGICA JS INVARIATA RISPETTO ALLA V2.5.2 - CALCOLO SCIA CATTIVA INCLUSO]
+    /* --- COSTANTI E VARIABILI GLOBALI --- */
     const PUNTI_PER_GRADO = 1200;
     const STEP_METRI = 90;
     let terrainData = null;
@@ -123,8 +117,10 @@
     let ctx = null;
     let isDynamic = true;
     let isBN = false;
+    let isTacticMode = false; // Stato dello Zoom (false = Strategico 13, true = Tattico 14.6)
     let flight = { lat: 44.8, lon: 9.1, hdg: 0, alt: 0, speed: 0, windSpd: 0, windDir: 0 };
 
+    /* --- ROUTINE: INIZIALIZZAZIONE APP --- */
     function init() {
         let savedDynamic, savedBN, cbDyn, cbBN;
         try {
@@ -133,32 +129,63 @@
             if (savedDynamic !== null) isDynamic = (savedDynamic === 'true');
             if (savedBN !== null) isBN = (savedBN === 'true');
         } catch (e) {}
+
         canvas = document.getElementById('aeroCanvas');
         ctx = canvas.getContext('2d');
+
+        // Partenza obbligatoria in modalità STRATEGICA (Zoom 13)
         map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 13);
         L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
+
+        // REM: Gestione Click sul Vento per Flip-Flop Zoom
+        const windBtn = document.getElementById('wind-box');
+        windBtn.addEventListener('click', toggleZoom);
+        windBtn.addEventListener('touchstart', (e) => { e.preventDefault(); toggleZoom(); });
+
         cbDyn = document.getElementById('chkDynamic');
         cbBN = document.getElementById('chkMapBN');
         cbDyn.checked = isDynamic;
         cbBN.checked = isBN;
         cbDyn.addEventListener('change', (e) => { isDynamic = e.target.checked; localStorage.setItem('rg_isDynamic', isDynamic); });
         cbBN.addEventListener('change', (e) => { isBN = e.target.checked; localStorage.setItem('rg_isBN', isBN); applyMapStyle(); });
+        
         applyMapStyle();
         window.onresize = resize;
         resize();
         setInterval(updateFromXCTrack, 500);
     }
 
+    /* --- ROUTINE: GESTIONE FLIP-FLOP ZOOM --- */
+    function toggleZoom() {
+        isTacticMode = !isTacticMode;
+        const targetZoom = isTacticMode ? 14.6 : 13;
+        const statusTxt = document.getElementById('zoom-status');
+        const feedbackBox = document.getElementById('zoom-feedback');
+        
+        map.setZoom(targetZoom, { animate: true });
+        
+        if (isTacticMode) {
+            statusTxt.innerText = "TATTICA";
+            feedbackBox.style.background = "#e67e22"; // Arancione
+        } else {
+            statusTxt.innerText = "STRATEGICA";
+            feedbackBox.style.background = "#2c3e50"; // Blu
+        }
+    }
+
+    /* --- ROUTINE: STILE MAPPA --- */
     function applyMapStyle() {
         let mapDiv = document.getElementById('map');
         mapDiv.style.filter = isBN ? "grayscale(1) contrast(1.8) brightness(0.9) opacity(0.8)" : "none";
     }
 
+    /* --- ROUTINE: RESIZE CANVAS --- */
     function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
     }
 
+    /* --- ROUTINE: ACQUISIZIONE DATI XCTRACK --- */
     function updateFromXCTrack() {
         let xc, data, radH, radB, airX, airY, gndX, gndY, wX, wY, ws, wd;
         try {
@@ -190,9 +217,10 @@
         } catch (e) {}
     }
 
+    /* --- ROUTINE: AGGIORNAMENTO VISTA E CARICAMENTO TILE --- */
     async function updateView() {
         let tID, arrowRot, response, json;
-        map.setView([flight.lat, flight.lon], 13, { animate: false });
+        map.setView([flight.lat, flight.lon], map.getZoom(), { animate: false });
         document.getElementById('map').style.transform = `rotate(${-flight.hdg}deg)`;
         document.getElementById('alt-txt').innerText = flight.alt;
         document.getElementById('spd-txt').innerText = flight.windSpd;
@@ -212,6 +240,7 @@
         drawAnalysis();
     }
 
+    /* --- ROUTINE: CALCOLO E DISEGNO ANALISI (LIFT/SINK/WAKE) --- */
     function drawAnalysis() {
         let wspd, wdir, rad, vx, vy, res, rangeIdx, dropValue, maxSteps;
         let x, y, relX, relY, angleHdg, pLon, pLat, cx, cy, h;
