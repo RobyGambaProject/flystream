@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>RGproject_StandAlone_V3.2.2</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        /* --- [REM] STILI BASE --- */
+        body { margin: 0; padding: 0; background: #000; overflow: hidden; font-family: sans-serif; }
+        #viewport { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; }
+        #map { position: absolute; top: 50%; left: 50%; width: 220vmax; height: 220vmax; margin-top: -110vmax; margin-left: -110vmax; }
+        #aeroCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1500; opacity: 0.6; }
+        
+        /* --- [REM] DASHBOARD SUPERIORE --- */
+        #dashboard { position: absolute; top: 0; left: 0; width: 100%; height: 110px; background: white; z-index: 2000; display: grid; grid-template-columns: 1fr 1fr 1fr; border-bottom: 2px solid #2c3e50; align-items: center; }
+        .box { border-right: 1px solid #ccc; padding: 5px; text-align: center; }
+        .label { font-size: 14px; font-weight: 800; color: #2980b9; display: block; text-transform: uppercase; }
+        .val { font-size: 52px; font-weight: 900; color: #2c3e50; line-height: 1; }
+
+        /* --- [REM] ZONA TECNICA INFERIORE --- */
+        #bottom-tech-zone { position: absolute; bottom: 55px; left: 50%; transform: translateX(-50%); width: 95%; display: flex; justify-content: space-between; align-items: flex-end; z-index: 3000; }
+        #config-panel { background: rgba(255,255,255,0.9); padding: 8px 12px; border-radius: 8px; border: 1.5px solid #2c3e50; font-size: 11px; font-weight: bold; }
+        #reliability-panel { background: rgba(44, 62, 80, 0.95); color: white; padding: 8px 12px; border-radius: 8px; font-family: monospace; min-width: 100px; }
+        
+        /* --- [REM] WIND BOX ALTO DESTRA --- */
+        #wind-main-container { position: absolute; top: 125px; right: 15px; z-index: 2500; display: flex; flex-direction: column; align-items: center; }
+        #wind-box { background: white; border-radius: 50%; border: 2px solid #2c3e50; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; }
+        #wind-info-display { background: #2c3e50; color: white; border-radius: 6px; margin-top: 5px; text-align: center; border: 1px solid white; min-width: 85px; }
+
+        #signature-box { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 4000; background: rgba(255,255,255,0.85); padding: 5px 15px; border-radius: 20px; border: 1.5px solid #2c3e50; font-family: cursive; font-size: 12px; font-weight: bold; display: flex; align-items: center; gap: 5px; }
+        #pilot { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5000; width: 35px; }
+        #agl-txt { color: #e67e22; }
+    </style>
+</head>
+<body>
+
+<div id="dashboard">
+    <div class="box"><span class="label">ALT (m)</span><span id="alt-txt" class="val">---</span></div>
+    <div class="box"><span class="label">WIND (k/h)</span><span id="spd-txt" class="val">---</span></div>
+    <div class="box"><span class="label">AGL (m)</span><span id="agl-txt" class="val">---</span></div>
+</div>
+
+<div id="wind-main-container">
+    <div id="wind-box" onclick="toggleZoom()">
+        <svg id="wind-arrow" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="3"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+    </div>
+    <div id="wind-info-display">
+        <span id="wind-deg-val">0°</span>
+        <span id="mode-status" style="font-size:9px; display:block; padding:2px;">STRATEGICA</span>
+    </div>
+</div>
+
+<div id="bottom-tech-zone">
+    <div id="config-panel">
+        GPS: <span id="gps-status" style="color:red;">OFF</span> | <span id="wake-status" style="color:orange;">W-OFF</span><br>
+        OFFSET: <span id="off-val">0</span>m <button onclick="autoCalibrate()">CALIBRA</button><br>
+        <input type="checkbox" id="chkDynamic" checked> SCIA | <input type="checkbox" id="chkMapBN"> B/N
+    </div>
+    <div id="reliability-panel">
+        <div style="font-size:12px;">🕒 <span id="rel-time" style="color:#f1c40f">0'</span></div>
+        <div style="font-size:12px;">📍 <span id="rel-dist" style="color:#f1c40f">0k</span></div>
+    </div>
+</div>
+
+<div id="signature-box">RG Project Stand-Alone <span style="background:#2c3e50;color:white;padding:1px 5px;border-radius:4px;font-family:monospace;font-size:10px;">V.3.2.2</span></div>
+
+<svg id="pilot" viewBox="0 0 24 24" fill="#3498db" stroke="white" stroke-width="1.5"><path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z"/></svg>
+
+<div id="viewport"><div id="map"></div></div>
+<canvas id="aeroCanvas"></canvas>
+
+<script>
+    /* ---------------------------------------------------------
+       [ROUTINE: VARIABILI E CALIBRAZIONE GPS]
+       --------------------------------------------------------- */
+    const PUNTI_PER_GRADO = 1200;
+    let terrainData = null, currentTile = "", map = null, canvas = null, ctx = null;
+    let flight = { lat: 0, lon: 0, hdg: 0, alt: 0, windSpd: 0, windDir: 0 };
+    let altOffset = 0; // [REM] Correzione errore ellissoide/geoide
+    let isTacticMode = false;
+
+    /* [REM] Calibrazione manuale: azzera l'AGL se sei a terra */
+    function autoCalibrate() {
+        if (!terrainData) return;
+        let cx = Math.floor((flight.lon % 1) * PUNTI_PER_GRADO);
+        let cy = (PUNTI_PER_GRADO - 1) - Math.floor((flight.lat % 1) * PUNTI_PER_GRADO);
+        let groundH = terrainData[cy][cx];
+        altOffset = groundH - flight.alt;
+        document.getElementById('off-val').innerText = Math.round(altOffset);
+    }
+
+    /* ---------------------------------------------------------
+       [ROUTINE: CORE ENGINE]
+       --------------------------------------------------------- */
+    async function init() {
+        canvas = document.getElementById('aeroCanvas');
+        ctx = canvas.getContext('2d');
+        map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 12);
+        L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
+
+        if ("geolocation" in navigator) {
+            navigator.geolocation.watchPosition(updatePosition, null, { enableHighAccuracy: true });
+        }
+        window.onresize = resize; resize();
+        if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(()=>{});
+    }
+
+    function updatePosition(pos) {
+        document.getElementById('gps-status').innerText = "LIVE";
+        document.getElementById('gps-status').style.color = "green";
+        flight.lat = pos.coords.latitude;
+        flight.lon = pos.coords.longitude;
+        flight.alt = Math.round(pos.coords.altitude || 0);
+        flight.hdg = pos.coords.heading || 0;
+        updateView();
+    }
+
+    async function updateView() {
+        if (flight.lat === 0) return;
+        map.setView([flight.lat, flight.lon], map.getZoom(), { animate: false });
+        document.getElementById('map').style.transform = `rotate(${-flight.hdg}deg)`;
+        
+        // [REM] Quota corretta con Offset
+        let correctedAlt = flight.alt + altOffset;
+        document.getElementById('alt-txt').innerText = Math.round(correctedAlt);
+
+        let tID = `map_${Math.floor(flight.lat)}_${Math.floor(flight.lon)}`;
+        if (currentTile !== tID) {
+            try {
+                let res = await fetch(`data_json/${tID}.json`);
+                if (res.ok) { terrainData = (await res.json()).data; currentTile = tID; }
+            } catch(e) {}
+        }
+        drawAnalysis(correctedAlt);
+    }
+
+    /* ---------------------------------------------------------
+       [ROUTINE: ANALISI OROGRAFICA E SINCRONIZZAZIONE]
+       --------------------------------------------------------- */
+    function drawAnalysis(cAlt) {
+        if (!terrainData) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let rangeIdx = 0.045 / Math.pow(2, (map.getZoom() - 12));
+        let res = 6;
+
+        for (let x = 0; x < canvas.width; x += res) {
+            for (let y = 0; y < canvas.height; y += res) {
+                // [REM] Mira precisa al centro pixel
+                let relX = (x - canvas.width / 2) / (canvas.width / 2) * rangeIdx;
+                let relY = -(y - canvas.height / 2) / (canvas.height / 2) * rangeIdx;
+                let aH = -flight.hdg * (Math.PI / 180);
+                let pLon = flight.lon + (relX * Math.cos(aH) - relY * Math.sin(aH));
+                let pLat = flight.lat + (relX * Math.sin(aH) + relY * Math.cos(aH));
+                
+                let cx = Math.floor((pLon % 1) * PUNTI_PER_GRADO);
+                let cy = (PUNTI_PER_GRADO - 1) - Math.floor((pLat % 1) * PUNTI_PER_GRADO);
+                
+                if (terrainData[cy] && terrainData[cy][cx]) {
+                    let h = terrainData[cy][cx];
+                    // [REM] Calcolo AGL corretta al centro
+                    if (Math.abs(x - canvas.width/2) < res && Math.abs(y - canvas.height/2) < res) {
+                        document.getElementById('agl-txt').innerText = Math.round(cAlt - h);
+                    }
+                    // [REM] Visualizzazione zone pericolose
+                    if (h >= cAlt) { ctx.fillStyle = "rgba(40,40,40,0.8)"; ctx.fillRect(x,y,res,res); }
+                }
+            }
+        }
+    }
+
+    function toggleZoom() {
+        isTacticMode = !isTacticMode;
+        map.setZoom(isTacticMode ? 14.6 : 12);
+        document.getElementById('mode-status').innerText = isTacticMode ? "TATTICA" : "STRATEGICA";
+    }
+
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    init();
+</script>
+</body>
+</html>
