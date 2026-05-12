@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>RGproject_AI_FlyStreamV2.5.8</title>
+    <title>RGproject_AI_FlyStreamV2.5.8_Doc</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -11,19 +11,23 @@
         body { margin: 0; padding: 0; background: #000; overflow: hidden; font-family: sans-serif; }
         #viewport { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; }
         
+        /* Contenitore Mappa: sovradimensionato per gestire la rotazione senza bordi neri */
         #map { 
             position: absolute; top: 50%; left: 50%; width: 220vmax; height: 220vmax; 
             margin-top: -110vmax; margin-left: -110vmax; 
             transition: transform 0.1s linear, filter 0.3s ease; 
         }
         
+        /* Canvas per Overlay Analisi Orogrfica (Vento/Sottovento) */
         #aeroCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1500; opacity: 0.6; }
         
+        /* Dashboard Superiore: visualizzazione dati telemetrici */
         #dashboard { position: absolute; top: 0; left: 0; width: 100%; height: 110px; background: white; z-index: 2000; display: grid; grid-template-columns: 1fr 1fr 1fr; border-bottom: 2px solid #2c3e50; align-items: center; }
         .box { border-right: 1px solid #ccc; padding: 5px; text-align: center; }
         .label { font-size: 14px; font-weight: 800; color: #2980b9; display: block; text-transform: uppercase; }
         .val { font-size: 52px; font-weight: 900; color: #2c3e50; line-height: 1; }
 
+        /* Etichetta Feedback Zoom (Tattica/Strategica) */
         #zoom-feedback {
             position: absolute; bottom: -22px; right: 10px; 
             background: #2c3e50; color: white; padding: 2px 15px; border-radius: 0 0 8px 8px;
@@ -31,6 +35,7 @@
             transition: background 0.3s ease; border: 1px solid #2c3e50; border-top: none;
         }
 
+        /* Container Indicatore Vento (Cerchio + Gradi) */
         #wind-container {
             position: absolute; top: 130px; right: 20px; z-index: 2500;
             display: flex; flex-direction: column; align-items: center; gap: 5px;
@@ -44,6 +49,7 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
         }
         
+        /* Box Gradi Vento (Glassmorphism style) */
         #wind-deg-box {
             background: rgba(44, 62, 80, 0.85); color: white;
             min-width: 55px; text-align: center; border-radius: 6px;
@@ -56,6 +62,7 @@
         #wind-box:active { transform: scale(0.9); }
         #wind-arrow { width: 45px; height: 45px; transition: transform 0.2s linear; }
 
+        /* Pannello Configurazione (Checkbox) */
         #config-panel {
             position: absolute; top: 120px; left: 10px; z-index: 3500;
             background: rgba(255, 255, 255, 0.95); padding: 12px; border-radius: 10px;
@@ -63,6 +70,7 @@
             display: flex; flex-direction: column; gap: 12px; min-width: 180px;
         }
 
+        /* Firma e Versione unificata in basso */
         #signature-box { 
             position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); 
             z-index: 4000; background: rgba(255, 255, 255, 0.85); padding: 6px 18px; 
@@ -71,8 +79,9 @@
         }
         .ver-span { font-family: monospace; font-size: 11px; background: #2c3e50; color: white; padding: 1px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; }
 
+        /* Icona Pilota (Centro Schermo) */
         #pilot { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5000 !important; width: 35px; pointer-events: none; }
-        #agl-txt { color: #e67e22; }
+        #agl-txt { color: #e67e22; } /* Colore arancio per AGL (allerta suolo) */
         .ctrl-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
         .ctrl-row label { font-weight: 900; font-size: 13px; color: #2c3e50; pointer-events: none; }
     </style>
@@ -119,24 +128,29 @@
 <canvas id="aeroCanvas"></canvas>
 
 <script>
-    const PUNTI_PER_GRADO = 1200;
-    const STEP_METRI = 90;
-    let terrainData = null;
-    let currentTile = "";
-    let map = null;
-    let canvas = null;
-    let ctx = null;
-    let isDynamic = true;
-    let isBN = false;
-    let isTacticMode = false;
+    /* --- COSTANTI E VARIABILI DI SISTEMA --- */
+    const PUNTI_PER_GRADO = 1200; // Risoluzione dati SRTM (1 arc-second)
+    const STEP_METRI = 90;        // Spaziatura campionamento orografico
+    let terrainData = null;       // Buffer dati altimetrici attuali
+    let currentTile = "";         // ID della tile JSON in memoria
+    let map = null;               // Istanza Leaflet
+    let canvas = null;            // Elemento per analisi grafica
+    let ctx = null;               // Contesto 2D Canvas
+    let isDynamic = true;         // Flag calcolo scia dinamica
+    let isBN = false;             // Flag stile mappa bianco e nero
+    let isTacticMode = false;     // Flag stato zoom (Tattico/Strategico)
+    
+    // Oggetto stato volo aggiornato da XCTrack
     let flight = { lat: 44.8, lon: 9.1, hdg: 0, alt: 0, speed: 0, windSpd: 0, windDir: 0 };
 
+    /* --- ROUTINE: INIZIALIZZAZIONE APP --- */
     function init() {
         let savedDynamic, savedBN, savedTactic, cbDyn, cbBN;
         try {
+            // Recupero stati da memoria locale (persistenza al ricaricamento)
             savedDynamic = localStorage.getItem('rg_isDynamic');
             savedBN = localStorage.getItem('rg_isBN');
-            savedTactic = localStorage.getItem('rg_isTacticMode'); // Recupero stato zoom
+            savedTactic = localStorage.getItem('rg_isTacticMode'); 
             
             if (savedDynamic !== null) isDynamic = (savedDynamic === 'true');
             if (savedBN !== null) isBN = (savedBN === 'true');
@@ -146,18 +160,19 @@
         canvas = document.getElementById('aeroCanvas');
         ctx = canvas.getContext('2d');
 
-        // Imposta lo zoom iniziale in base alla memoria
+        // Setup Mappa con zoom iniziale persistente
         const startZoom = isTacticMode ? 14.6 : 12;
         map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], startZoom);
         L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
         
-        // Aggiorna l'interfaccia visiva dello zoom al caricamento
-        updateZoomUI();
+        updateZoomUI(); // Sincronizza testi/colori UI
 
+        // Eventi Interazione Vento/Zoom
         const windBtn = document.getElementById('wind-box');
         windBtn.addEventListener('click', toggleZoom);
         windBtn.addEventListener('touchstart', (e) => { e.preventDefault(); toggleZoom(); });
 
+        // Setup Checkbox Configurazione
         cbDyn = document.getElementById('chkDynamic');
         cbBN = document.getElementById('chkMapBN');
         cbDyn.checked = isDynamic;
@@ -168,18 +183,19 @@
         applyMapStyle();
         window.onresize = resize;
         resize();
-        setInterval(updateFromXCTrack, 500);
+        setInterval(updateFromXCTrack, 500); // Loop polling dati telemetrici
     }
 
+    /* --- ROUTINE: GESTIONE ZOOM (TATTICA/STRATEGICA) --- */
     function toggleZoom() {
         isTacticMode = !isTacticMode;
-        localStorage.setItem('rg_isTacticMode', isTacticMode); // Salvataggio stato
+        localStorage.setItem('rg_isTacticMode', isTacticMode); // Salva stato per ricaricamento 5min
         const targetZoom = isTacticMode ? 14.6 : 12;
         map.setZoom(targetZoom, { animate: true });
         updateZoomUI();
     }
 
-    // Funzione dedicata per aggiornare i testi e i colori del feedback zoom
+    /* --- ROUTINE: AGGIORNAMENTO UI ZOOM --- */
     function updateZoomUI() {
         const statusTxt = document.getElementById('zoom-status');
         const feedbackBox = document.getElementById('zoom-feedback');
@@ -192,16 +208,19 @@
         }
     }
 
+    /* --- ROUTINE: APPLICAZIONE FILTRI MAPPA --- */
     function applyMapStyle() {
         let mapDiv = document.getElementById('map');
         mapDiv.style.filter = isBN ? "grayscale(1) contrast(1.8) brightness(0.9) opacity(0.8)" : "none";
     }
 
+    /* --- ROUTINE: ADATTAMENTO DIMENSIONI CANVAS --- */
     function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
     }
 
+    /* --- ROUTINE: INTERFACCIA DATI XCTRACK --- */
     function updateFromXCTrack() {
         let xc, data, radH, radB, airX, airY, gndX, gndY, wX, wY, ws, wd;
         try {
@@ -211,6 +230,8 @@
                 flight.lat = Number(data.lat); flight.lon = Number(data.lon);
                 flight.alt = Math.round(Number(data.altGps));
                 flight.hdg = Number(data.heading || 0);
+                
+                // Logica calcolo vento (Ground Speed vs Air Speed) o fallback su dati sensore
                 if (data.airspeed > 0) {
                     radH = Number(data.heading) * Math.PI / 180;
                     radB = Number(data.bearingGps) * Math.PI / 180;
@@ -230,15 +251,20 @@
         } catch (e) {}
     }
 
+    /* --- ROUTINE: AGGIORNAMENTO VISTA E CARICAMENTO JSON --- */
     async function updateView() {
         let tID, arrowRot, response, json;
         map.setView([flight.lat, flight.lon], map.getZoom(), { animate: false });
         document.getElementById('map').style.transform = `rotate(${-flight.hdg}deg)`;
         document.getElementById('alt-txt').innerText = flight.alt;
         document.getElementById('spd-txt').innerText = flight.windSpd;
+        
+        // Rotazione freccia vento relativa alla prua (heading)
         arrowRot = (flight.windDir - flight.hdg) + 180;
         document.getElementById('wind-arrow').style.transform = `rotate(${arrowRot}deg)`;
         document.getElementById('wind-val').innerText = Math.round(flight.windDir);
+        
+        // Caricamento Tile Altimetrica basata su Lat/Lon intere
         tID = `map_${Math.floor(flight.lat)}_${Math.floor(flight.lon)}`;
         if (currentTile !== tID) {
             try {
@@ -250,43 +276,59 @@
                 }
             } catch(e) {}
         }
-        drawAnalysis();
+        drawAnalysis(); // Trigger analisi grafica orografica
     }
 
+    /* --- ROUTINE: CALCOLO E DISEGNO ANALISI OROGRAFICA --- */
     function drawAnalysis() {
         let wspd, wdir, rad, vx, vy, res, rangeIdx, dropValue, maxSteps;
         let x, y, relX, relY, angleHdg, pLon, pLat, cx, cy, h;
         let inWakeShadow, d, lx, ly, gx, gy, localForce;
         if (!terrainData) return;
+        
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         wspd = flight.windSpd; wdir = flight.windDir;
         rad = (wdir - 90) * (Math.PI / 180);
-        vx = -Math.cos(rad); vy = Math.sin(rad);
-        res = 6; rangeIdx = 0.045 / Math.pow(2, (map.getZoom() - 12));
+        vx = -Math.cos(rad); vy = Math.sin(rad); // Vettori direzione vento
+        
+        res = 6; // Passo scansione pixel canvas
+        rangeIdx = 0.045 / Math.pow(2, (map.getZoom() - 12)); // Scala orografica adattiva allo zoom
+
+        // Parametri Scia Dinamica basati su forza vento
         if (isDynamic) {
             dropValue = Math.max(8, 40 - (wspd * 0.8)); 
             maxSteps = Math.min(16, Math.floor(wspd / 1.5) + 4); 
         } else {
             dropValue = 35; maxSteps = 6;
         }
+
+        // Loop Scansione Schermo
         for (x = 0; x < canvas.width; x += res) {
             for (y = 0; y < canvas.height; y += res) {
+                // Conversione Pixel -> Lat/Lon
                 relX = (x - canvas.width / 2) / (canvas.width / 2) * rangeIdx;
                 relY = -(y - canvas.height / 2) / (canvas.height / 2) * rangeIdx;
                 angleHdg = -flight.hdg * (Math.PI / 180);
                 pLon = flight.lon + (relX * Math.cos(angleHdg) - relY * Math.sin(angleHdg));
                 pLat = flight.lat + (relX * Math.sin(angleHdg) + relY * Math.cos(angleHdg));
+                
+                // Lookup Altimetria SRTM
                 cx = Math.floor((pLon % 1) * PUNTI_PER_GRADO);
                 cy = (PUNTI_PER_GRADO - 1) - Math.floor((pLat % 1) * PUNTI_PER_GRADO);
+                
                 if (terrainData[cy] && terrainData[cy][cx]) {
                     h = terrainData[cy][cx];
+                    // Calcolo AGL al centro schermo
                     if (Math.abs(x - canvas.width/2) < res && Math.abs(y - canvas.height/2) < res) {
                         document.getElementById('agl-txt').innerText = Math.round(flight.alt - h);
                     }
+                    // Colorazione Montagna (se sopra la quota volo)
                     if (h >= flight.alt) {
                         ctx.fillStyle = "rgba(40, 40, 40, 0.8)";
                         ctx.fillRect(x, y, res, res); continue;
                     }
+                    
+                    // Analisi Sottovento (Raycasting inverso verso il vento)
                     inWakeShadow = false;
                     for (d = 1; d <= maxSteps; d++) {
                         lx = Math.floor(((pLon - vx*0.00025*d) % 1) * PUNTI_PER_GRADO);
@@ -295,19 +337,25 @@
                             inWakeShadow = true; break; 
                         }
                     }
+                    
+                    // Calcolo Forza Locale (Gradiente del terreno vs Vento)
                     gx = ((terrainData[cy][cx+1]||h)-(terrainData[cy][cx-1]||h))/(2*STEP_METRI);
                     gy = ((terrainData[cy+1]?terrainData[cy+1][cx]:h)-(terrainData[cy-1]?terrainData[cy-1][cx]:h))/(2*STEP_METRI);
                     localForce = (vx * gx + vy * gy) * (wspd / 10);
-                    if (Math.abs(flight.alt - h) > (600 + wspd * 5)) localForce = 0;
-                    if (inWakeShadow) ctx.fillStyle = "rgba(100, 100, 100, 0.6)";
-                    else if (localForce < -0.12) ctx.fillStyle = "rgba(231, 76, 60, 0.7)";
-                    else if (localForce > 0.08) ctx.fillStyle = "rgba(46, 204, 113, 0.6)";
-                    else ctx.fillStyle = "rgba(0,0,0,0)";
+                    
+                    // Rendering finale pixel
+                    if (Math.abs(flight.alt - h) > (600 + wspd * 5)) localForce = 0; // Filtro distanza verticale
+                    if (inWakeShadow) ctx.fillStyle = "rgba(100, 100, 100, 0.6)"; // Sottovento (Grigio)
+                    else if (localForce < -0.12) ctx.fillStyle = "rgba(231, 76, 60, 0.7)"; // Discendenza (Rosso)
+                    else if (localForce > 0.08) ctx.fillStyle = "rgba(46, 204, 113, 0.6)"; // Ascendenza (Verde)
+                    else ctx.fillStyle = "rgba(0,0,0,0)"; // Neutro
+                    
                     ctx.fillRect(x, y, res, res);
                 }
             }
         }
     }
+    // Avvio Applicazione
     init();
 </script>
 </body>
