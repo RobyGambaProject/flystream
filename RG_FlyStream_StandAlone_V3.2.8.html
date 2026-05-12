@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>RGproject_FullCode_V3.2.9</title>
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEyMCIgZmlsbD0id2hpdGUiLz48cGF0aCBkPSJNMTAwIDI5MGM2MC00MCAxNTAtNDAgMjAwIDBzMTQwIDQwIDIwMCAwIiBmaWxsPSJub25lIiBzdHJva2U9IiMzNDk4ZGIiIHN0cm9rZS13aWR0aD0iMTgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxwYXRoIGQ9Ik0xNDAgMTgwYzAtMTAwIDI0MC0xMDAgMjQwIDAgMCA0MC0yNDAgNDAtMjQwIDBaIiBmaWxsPSIjZDRmZjAwIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0xNDAgMTgwTDI1NiAyODBNMzgwIDE4MEwyNTYgMjgwTTI1NiAxNDBMMjU2IDI4MCIgc3Ryb2tlPSIjOTk5IiBzdHJva2Utd2lkdGg9IjEuNSIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI4MCIgcj0iNiIgZmlsbD0iIzMzMyIvPjwvc3ZnPg==">
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEyMCIgZmlsbD0id2hpdGUiLz48cGF0aCBkPSJNMTAwIDI5MGM2MC00MCAxNTAtNDAgMjAwIDBzMTQwIDQwIDIwMCAwIiBmaWxsPSJub25lIiBzdHJva2U9IiMzNDk4ZGIiIHN0cm9rZS13aWR0aD0iMTgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxwYXRoIGQ9Ik0xNDAgMTgwYzAtMTAwIDI0MC0xMDAgMjQwIDAgMCA0MC0yNDAgNDAtMjQwIDBaIiBmaWxsPSIjZDRmZjAwIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMyIvPjxwYXRoIGQ9Ik0xNDAgMTgwTDI1NiAyODBNMzgwIDE4MEwyNTYgMjgwTTI1NiAxNDBMMjU2IDI4MCIgc3Ryb2tlPSIjOTk5IiBzdHJva2Utd2lkdGg9IjEuNSIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI4MCIgcj0iNiIgZmlsbD0iIzMzMyIvPjwvc3ZnPg==">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <style>
+        /* [REM] LAYOUT BASE E VIEWPORT */
+        body { margin: 0; padding: 0; background: #000; overflow: hidden; font-family: sans-serif; }
+        #viewport { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; }
+        
+        /* [REM] MAPPA E FILTRI */
+        /* La mappa è sovradimensionata per permettere la rotazione senza bordi neri */
+        #map { position: absolute; top: 50%; left: 50%; width: 220vmax; height: 220vmax; margin-top: -110vmax; margin-left: -110vmax; transition: transform 0.2s linear; }
+        .map-bn .leaflet-tile { filter: grayscale(1) contrast(1.2) brightness(1.1) !important; }
+
+        /* [REM] CANVANS ANALISI AEROLOGICA */
+        #aeroCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1500; opacity: 0.6; }
+
+        /* [REM] DASHBOARD PRINCIPALE (ALTA) */
+        #dashboard { position: absolute; top: 0; left: 0; width: 100%; height: 110px; background: white; z-index: 2000; display: grid; grid-template-columns: 1fr 1fr 1fr; border-bottom: 2px solid #2c3e50; align-items: center; }
+        .box { border-right: 1px solid #ccc; padding: 5px; text-align: center; }
+        .label { font-size: 14px; font-weight: 800; color: #2980b9; display: block; text-transform: uppercase; }
+        .val { font-size: 52px; font-weight: 900; color: #2c3e50; line-height: 1; }
+        #agl-txt { color: #e67e22; }
+
+        /* [REM] SPLASH SCREEN / FULLSCREEN OVERLAY */
+        #fs-overlay { position: fixed; top:0; left:0; width:100%; height:100%; z-index: 9999; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; }
+        #fs-overlay svg { width: 180px; height: 180px; margin-bottom: 20px; }
+
+        /* [REM] BLOCCO TECNICO (BASSO) */
+        #bottom-tech-zone { position: absolute; bottom: 55px; left: 50%; transform: translateX(-50%); width: 95%; display: flex; justify-content: space-between; align-items: flex-end; z-index: 3000; }
+        #config-panel { background: rgba(255,255,255,0.95); padding: 8px 12px; border-radius: 8px; border: 1.5px solid #2c3e50; font-size: 11px; font-weight: bold; min-width: 140px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        #reliability-panel { background: rgba(44, 62, 80, 0.95); color: white; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); min-width: 100px; font-family: monospace; }
+        .rel-item { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+        .rel-val { color: #f1c40f; font-weight: bold; }
+
+        /* [REM] INDICATORE VENTO (DESTRA) */
+        #wind-main-container { position: absolute; top: 125px; right: 15px; z-index: 2500; display: flex; flex-direction: column; align-items: center; }
+        #wind-box { background: white; padding: 8px; border-radius: 50%; border: 2px solid #2c3e50; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        #wind-arrow { width: 40px; height: 40px; transition: transform 0.3s linear; }
+        #wind-info-display { background: #2c3e50; color: white; border-radius: 6px; margin-top: 5px; text-align: center; border: 1px solid white; min-width: 85px; }
+
+        /* [REM] FIRMA E PILOTA */
+        #signature-box { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 4000; background: rgba(255,255,255,0.85); padding: 5px 15px; border-radius: 20px; border: 1.5px solid #2c3e50; font-family: cursive; font-size: 11px; }
+        #pilot { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5000; width: 35px; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+<div id="fs-overlay" onclick="startApp()">
+    <svg viewBox="0 0 512 512">
+        <path d="M100 320c60-40 150-40 200 0s140 40 200 0" fill="none" stroke="#3498db" stroke-width="22" stroke-linecap="round"/>
+        <path d="M140 200c0-100 240-100 240 0 0 40-240 40-240 0Z" fill="#d4ff00" stroke="#fff" stroke-width="4"/>
+        <path d="M140 200L256 300M380 200L256 300M256 150L256 300" stroke="#fff" stroke-width="1.5" opacity="0.6"/>
+    </svg>
+    <h2 style="margin:0">RG PROJECT V.3.2.9</h2>
+    <p style="opacity:0.7">Tocca per decollare</p>
+</div>
+
+<div id="dashboard">
+    <div class="box"><span class="label">ALT (m)</span><span id="alt-txt" class="val">---</span></div>
+    <div class="box"><span class="label">WIND (k/h)</span><span id="spd-txt" class="val">---</span></div>
+    <div class="box"><span class="label">AGL (m)</span><span id="agl-txt" class="val">---</span></div>
+</div>
+
+<div id="wind-main-container">
+    <div id="wind-box" onclick="toggleZoom()">
+        <svg id="wind-arrow" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="3"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+    </div>
+    <div id="wind-info-display">
+        <span id="wind-deg-val" style="font-size:18px; font-weight:bold;">0°</span>
+        <span id="mode-status" style="font-size:9px; display:block; padding:2px; background:#34495e;">STRATEGICA</span>
+    </div>
+</div>
+
+<div id="bottom-tech-zone">
+    <div id="config-panel">
+        GPS: <span id="gps-status" style="color:red;">OFF</span> | <span id="wake-status" style="color:orange;">☕</span><br>
+        <input type="checkbox" id="chkDynamic" checked> SCIA | <input type="checkbox" id="chkMapBN"> B/N
+    </div>
+    <div id="reliability-panel">
+        <div class="rel-item">🕒 <span id="rel-time" class="rel-val">0'</span></div>
+        <div class="rel-item">📍 <span id="rel-dist" class="rel-val">0k</span></div>
+        <div class="rel-item">🏔️ <span id="rel-alt" class="rel-val">0m</span></div>
+    </div>
+</div>
+
+<div id="signature-box">RG Project Stand-Alone</div>
+
+<svg id="pilot" viewBox="0 0 24 24" fill="#3498db" stroke="white" stroke-width="1.5"><path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z"/></svg>
+
+<div id="viewport"><div id="map"></div></div>
+<canvas id="aeroCanvas"></canvas>
+
+<script>
+    /* ---------------------------------------------------------
+       [ROUTINE: COSTANTI E VARIABILI GLOBALI]
+       --------------------------------------------------------- */
+    const PUNTI_PER_GRADO = 1200; // Risoluzione SRTM1
+    const STEP_METRI = 90;        // Distanza tra i punti del terreno
+    let terrainData = null;       // Matrice dati altimetrici
+    let currentTile = "";         // Tile SRTM attualmente caricata
+    let map = null;               // Istanza Leaflet
+    let canvas = null, ctx = null;// Elementi per il disegno aerologico
+    let isDynamic = true;         // Stato scia dinamica
+    let isTacticMode = false;     // Stato zoom tattico
+    
+    // Oggetto stato del volo
+    let flight = { lat: 0, lon: 0, hdg: 0, alt: 0, windSpd: 0, windDir: 0 };
+    // Stato per calcolo affidabilità vento
+    let lastWindUpdate = { time: Date.now(), lat: 0, lon: 0, alt: 0 };
+
+    /* ---------------------------------------------------------
+       [ROUTINE: startApp]
+       Gestisce l'attivazione FullScreen e il boot delle funzioni
+       --------------------------------------------------------- */
+    function startApp() {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) { elem.requestFullscreen(); }
+        else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+        document.getElementById('fs-overlay').style.display = 'none';
+        init();
+    }
+
+    /* ---------------------------------------------------------
+       [ROUTINE: init]
+       Inizializzazione mappa, sensori e listener interfaccia
+       --------------------------------------------------------- */
+    async function init() {
+        canvas = document.getElementById('aeroCanvas');
+        ctx = canvas.getContext('2d');
+        
+        // Setup Mappa
+        map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 12);
+        L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
+
+        // Geolocation Watcher
+        if ("geolocation" in navigator) {
+            navigator.geolocation.watchPosition(updatePosition, null, { enableHighAccuracy: true });
+        }
+
+        // Listener Filtro B/N
+        document.getElementById('chkMapBN').addEventListener('change', (e) => {
+            const m = document.getElementById('map');
+            if(e.target.checked) m.classList.add('map-bn'); else m.classList.remove('map-bn');
+        });
+
+        // Window Resize
+        window.onresize = resize; 
+        resize();
+
+        // Timer affidabilità vento
+        setInterval(refreshReliabilityUI, 5000);
+
+        // [REM] Wake Lock per prevenire standby schermo
+        if ('wakeLock' in navigator) {
+            try { await navigator.wakeLock.request('screen'); document.getElementById('wake-status').style.color="green"; } catch(e){}
+        }
+    }
+
+    /* ---------------------------------------------------------
+       [ROUTINE: updatePosition]
+       Aggiorna i dati GPS nel sistema e lancia il refresh vista
+       --------------------------------------------------------- */
+    function updatePosition(pos) {
+        document.getElementById('gps-status').innerText = "LIVE";
+        document.getElementById('gps-status').style.color = "green";
+        flight.lat = pos.coords.latitude;
+        flight.lon = pos.coords.longitude;
+        flight.alt = Math.round(pos.coords.altitude || 0);
+        flight.hdg = pos.coords.heading || 0;
+        updateView();
+    }
+
+    /* ---------------------------------------------------------
+       [ROUTINE: updateView]
+       Gestisce rotazione mappa, dashboard e caricamento dati terreno
+       --------------------------------------------------------- */
+    async function updateView() {
+        if (flight.lat === 0) return;
+        
+        // Centratura e rotazione
+        map.setView([flight.lat, flight.lon], map.getZoom(), { animate: false });
+        document.getElementById('map').style.transform = `rotate(${-flight.hdg}deg)`;
+        
+        // Aggiornamento Valori Dashboard
+        document.getElementById('alt-txt').innerText = flight.alt;
+        document.getElementById('spd-txt').innerText = flight.windSpd;
+        
+        // Rotazione Freccia Vento (relativa alla prua)
+        let arrowRot = (flight.windDir - flight.hdg) + 180;
+        document.getElementById('wind-arrow').style.transform = `rotate(${arrowRot}deg)`;
+        document.getElementById('wind-deg-val').innerText = Math.round(flight.windDir) + "°";
+
+        // [REM] Logica Caricamento JSON Terreno
+        let tID = `map_${Math.floor(flight.lat)}_${Math.floor(flight.lon)}`;
+        if (currentTile !== tID) {
+            try {
+                let res = await fetch(`data_json/${tID}.json`);
+                if (res.ok) { terrainData = (await res.json()).data; currentTile = tID; }
+            } catch(e) {}
+        }
+        drawAnalysis();
+    }
+
+    /* ---------------------------------------------------------
+       [ROUTINE: drawAnalysis]
+       CORE: Calcola ombre e portanze basate su vento e terreno
+       --------------------------------------------------------- */
+    function drawAnalysis() {
+        if (!terrainData) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        let wspd = flight.windSpd, wdir = flight.windDir;
+        let rad = (wdir - 90) * (Math.PI / 180), vx = -Math.cos(rad), vy = Math.sin(rad);
+        
+        let res = 6; // Dimensione pixel analisi
+        let rangeIdx = 0.045 / Math.pow(2, (map.getZoom() - 12));
+        let dropValue = Math.max(8, 40 - (wspd * 0.8));
+        let maxSteps = isDynamic ? Math.min(16, Math.floor(wspd / 1.5) + 4) : 6;
+
+        for (let x = 0; x < canvas.width; x += res) {
+            for (let y = 0; y < canvas.height; y += res) {
+                // Conversione Pixel -> Coordinate geografiche ruotate
+                let relX = (x - canvas.width / 2) / (canvas.width / 2) * rangeIdx;
+                let relY = -(y - canvas.height / 2) / (canvas.height / 2) * rangeIdx;
+                let aH = -flight.hdg * (Math.PI / 180);
+                let pLon = flight.lon + (relX * Math.cos(aH) - relY * Math.sin(aH));
+                let pLat = flight.lat + (relX * Math.sin(aH) + relY * Math.cos(aH));
+                
+                // Indici matrice
+                let cx = Math.floor((pLon % 1) * PUNTI_PER_GRADO);
+                let cy = (PUNTI_PER_GRADO - 1) - Math.floor((pLat % 1) * PUNTI_PER_GRADO);
+                
+                if (terrainData[cy] && terrainData[cy][cx]) {
+                    let h = terrainData[cy][cx];
+                    
+                    // [REM] Calcolo AGL in tempo reale al centro schermo
+                    if (Math.abs(x - canvas.width/2) < res && Math.abs(y - canvas.height/2) < res) {
+                        document.getElementById('agl-txt').innerText = Math.round(flight.alt - h);
+                    }
+
+                    // Se il terreno è più alto del pilota -> Grigio scuro (impatto)
+                    if (h >= flight.alt) { ctx.fillStyle = "rgba(40,40,40,0.8)"; ctx.fillRect(x,y,res,res); continue; }
+
+                    // [REM] Calcolo Cono d'Ombra (Sottovento)
+                    let inWake = false;
+                    for (let d = 1; d <= maxSteps; d++) {
+                        let lx = Math.floor(((pLon - vx*0.00025*d) % 1) * PUNTI_PER_GRADO);
+                        let ly = (PUNTI_PER_GRADO-1) - Math.floor(((pLat - vy*0.00025*d) % 1) * PUNTI_PER_GRADO);
+                        if (terrainData[ly] && terrainData[ly][lx] > (flight.alt - (d * dropValue))) { inWake = true; break; }
+                    }
+
+                    // [REM] Calcolo Pendenza e Portanza (Sopravvento)
+                    let gx = ((terrainData[cy][cx+1]||h)-(terrainData[cy][cx-1]||h))/(2*STEP_METRI);
+                    let gy = ((terrainData[cy+1]?terrainData[cy+1][cx]:h)-(terrainData[cy-1]?terrainData[cy-1][cx]:h))/(2*STEP_METRI);
+                    let force = (vx * gx + vy * gy) * (wspd / 10);
+
+                    // Colorazione finale
+                    if (inWake) ctx.fillStyle = "rgba(100,100,100,0.6)"; // Ombra
+                    else if (force < -0.12) ctx.fillStyle = "rgba(231,76,60,0.7)"; // Discendenza
+                    else if (force > 0.08) ctx.fillStyle = "rgba(46,204,113,0.6)";  // Portanza
+                    else ctx.fillStyle = "rgba(0,0,0,0)";
+                    
+                    ctx.fillRect(x,y,res,res);
+                }
+            }
+        }
+    }
+
+    /* ---------------------------------------------------------
+       [ROUTINE: toggleZoom]
+       Gestisce il passaggio tra zoom Strategico e Tattico
+       --------------------------------------------------------- */
+    function toggleZoom() {
+        isTacticMode = !isTacticMode;
+        map.setZoom(isTacticMode ? 14.6 : 12);
+        document.getElementById('mode-status').innerText = isTacticMode ? "TATTICA" : "STRATEGICA";
+        document.getElementById('mode-status').style.background = isTacticMode ? "#e67e22" : "#34495e";
+    }
+
+    /* ---------------------------------------------------------
+       [ROUTINE: refreshReliabilityUI]
+       Aggiorna il pannello informativo sui dati del vento
+       --------------------------------------------------------- */
+    function refreshReliabilityUI() {
+        let diffMin = Math.floor((Date.now() - lastWindUpdate.time) / 60000);
+        document.getElementById('rel-time').innerText = diffMin + "'";
+        if (lastWindUpdate.lat !== 0) {
+            let d = calculateDist(flight.lat, flight.lon, lastWindUpdate.lat, lastWindUpdate.lon);
+            document.getElementById('rel-dist').innerText = d.toFixed(1) + "k";
+        }
+        document.getElementById('rel-alt').innerText = lastWindUpdate.alt + "m";
+    }
+
+    /* ---------------------------------------------------------
+       [ROUTINE: calculateDist]
+       Utility matematica: distanza tra due coordinate (Haversine)
+       --------------------------------------------------------- */
+    function calculateDist(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Raggio terra in km
+        let dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+        let a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    /* ---------------------------------------------------------
+       [ROUTINE: resize]
+       Adattamento dinamico del canvas alla risoluzione dello schermo
+       --------------------------------------------------------- */
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+
+</script>
+</body>
+</html>
