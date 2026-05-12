@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>RGproject_AI_FlyStreamV2.5.7</title>
+    <title>RGproject_AI_FlyStreamV2.5.8</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -31,7 +31,6 @@
             transition: background 0.3s ease; border: 1px solid #2c3e50; border-top: none;
         }
 
-        /* --- GRUPPO VENTO (CORRETTO E CENTRATO) --- */
         #wind-container {
             position: absolute; top: 130px; right: 20px; z-index: 2500;
             display: flex; flex-direction: column; align-items: center; gap: 5px;
@@ -57,7 +56,6 @@
         #wind-box:active { transform: scale(0.9); }
         #wind-arrow { width: 45px; height: 45px; transition: transform 0.2s linear; }
 
-        /* --- RESTO UI --- */
         #config-panel {
             position: absolute; top: 120px; left: 10px; z-index: 3500;
             background: rgba(255, 255, 255, 0.95); padding: 12px; border-radius: 10px;
@@ -82,7 +80,7 @@
 <body>
 
 <div id="signature-box">
-    RG Project - AI FlyStream <span class="ver-span">V.2.5.7</span>
+    RG Project - AI FlyStream <span class="ver-span">V.2.5.8</span>
 </div>
 
 <div id="dashboard">
@@ -134,26 +132,39 @@
     let flight = { lat: 44.8, lon: 9.1, hdg: 0, alt: 0, speed: 0, windSpd: 0, windDir: 0 };
 
     function init() {
-        let savedDynamic, savedBN, cbDyn, cbBN;
+        let savedDynamic, savedBN, savedTactic, cbDyn, cbBN;
         try {
             savedDynamic = localStorage.getItem('rg_isDynamic');
             savedBN = localStorage.getItem('rg_isBN');
+            savedTactic = localStorage.getItem('rg_isTacticMode'); // Recupero stato zoom
+            
             if (savedDynamic !== null) isDynamic = (savedDynamic === 'true');
             if (savedBN !== null) isBN = (savedBN === 'true');
+            if (savedTactic !== null) isTacticMode = (savedTactic === 'true');
         } catch (e) {}
+
         canvas = document.getElementById('aeroCanvas');
         ctx = canvas.getContext('2d');
-        map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 12);
+
+        // Imposta lo zoom iniziale in base alla memoria
+        const startZoom = isTacticMode ? 14.6 : 12;
+        map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], startZoom);
         L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
+        
+        // Aggiorna l'interfaccia visiva dello zoom al caricamento
+        updateZoomUI();
+
         const windBtn = document.getElementById('wind-box');
         windBtn.addEventListener('click', toggleZoom);
         windBtn.addEventListener('touchstart', (e) => { e.preventDefault(); toggleZoom(); });
+
         cbDyn = document.getElementById('chkDynamic');
         cbBN = document.getElementById('chkMapBN');
         cbDyn.checked = isDynamic;
         cbBN.checked = isBN;
         cbDyn.addEventListener('change', (e) => { isDynamic = e.target.checked; localStorage.setItem('rg_isDynamic', isDynamic); });
         cbBN.addEventListener('change', (e) => { isBN = e.target.checked; localStorage.setItem('rg_isBN', isBN); applyMapStyle(); });
+        
         applyMapStyle();
         window.onresize = resize;
         resize();
@@ -162,12 +173,23 @@
 
     function toggleZoom() {
         isTacticMode = !isTacticMode;
+        localStorage.setItem('rg_isTacticMode', isTacticMode); // Salvataggio stato
         const targetZoom = isTacticMode ? 14.6 : 12;
+        map.setZoom(targetZoom, { animate: true });
+        updateZoomUI();
+    }
+
+    // Funzione dedicata per aggiornare i testi e i colori del feedback zoom
+    function updateZoomUI() {
         const statusTxt = document.getElementById('zoom-status');
         const feedbackBox = document.getElementById('zoom-feedback');
-        map.setZoom(targetZoom, { animate: true });
-        if (isTacticMode) { statusTxt.innerText = "TATTICA"; feedbackBox.style.background = "#e67e22"; }
-        else { statusTxt.innerText = "STRATEGICA"; feedbackBox.style.background = "#2c3e50"; }
+        if (isTacticMode) {
+            statusTxt.innerText = "TATTICA";
+            feedbackBox.style.background = "#e67e22"; 
+        } else {
+            statusTxt.innerText = "STRATEGICA";
+            feedbackBox.style.background = "#2c3e50"; 
+        }
     }
 
     function applyMapStyle() {
