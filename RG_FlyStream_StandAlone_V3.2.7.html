@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>RGproject_Extreme_V3.2.7</title>
+    
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+
+    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEwMCIgZmlsbD0id2hpdGUiLz48cGF0aCBkPSJNMTAwIDI1MGM1MC00MCAxNTAtNDAgMjAwIDBzMTUwIDQwIDIwMCAwIiBmaWxsPSJub25lIiBzdHJva2U9IiMzNDk4ZGIiIHN0cm9rZS13aWR0aD0iMjAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxwYXRoIGQ9Ik0yNTYgOTBjODAgMCAxNjAgNDAgMTYwIDQwcy04MCA0MC0xNjAgNDAtMTYwLTQwLTE2MC00MCA4MC00MCAxNjAtNDBaIiBmaWxsPSIjZDRmZjAwIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIvPjxwYXRoIGQ9Ik0yNTYgOTBMMTgwIDIzME0yNTYgOTBMMzMyIDIzME0yNTYgOTBMMjU2IDIzMCIgc3Ryb2tlPSIjNjY2IiBzdHJva2Utd2lkdGg9IjEiLz48Y2lyY2xlIGN4PSIyNTYiIGN5PSIyNDAiIHI9IjUiIGZpbGw9IiMzMzMiLz48L3N2Zz4=">
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEwMCIgZmlsbD0id2hpdGUiLz48cGF0aCBkPSJNMTAwIDI1MGM1MC00MCAxNTAtNDAgMjAwIDBzMTUwIDQwIDIwMCAwIiBmaWxsPSJub25lIiBzdHJva2U9IiMzNDk4ZGIiIHN0cm9rZS13aWR0aD0iMjAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjxwYXRoIGQ9Ik0yNTYgOTBjODAgMCAxNjAgNDAgMTYwIDQwcy04MCA0MC0xNjAgNDAtMTYwLTQwLTE2MC00MCA4MC00MCAxNjAtNDBaIiBmaWxsPSIjZDRmZjAwIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIvPjxwYXRoIGQ9Ik0yNTYgOTBMMTgwIDIzME0yNTYgOTBMMzMyIDIzME0yNTYgOTBMMjU2IDIzMCIgc3Ryb2tlPSIjNjY2IiBzdHJva2Utd2lkdGg9IjEiLz48Y2lyY2xlIGN4PSIyNTYiIGN5PSIyNDAiIHI9IjUiIGZpbGw9IiMzMzMiLz48L3N2Zz4=">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <style>
+        body { margin: 0; padding: 0; background: #000; overflow: hidden; font-family: sans-serif; }
+        #viewport { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; }
+        #map { position: absolute; top: 50%; left: 50%; width: 220vmax; height: 220vmax; margin-top: -110vmax; margin-left: -110vmax; transition: transform 0.2s linear; }
+        #aeroCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1500; opacity: 0.6; }
+        
+        .map-bn .leaflet-tile { filter: grayscale(1) contrast(1.2) brightness(1.1) !important; }
+
+        /* Dashboard Alta */
+        #dashboard { position: absolute; top: 0; left: 0; width: 100%; height: 110px; background: white; z-index: 2000; display: grid; grid-template-columns: 1fr 1fr 1fr; border-bottom: 2px solid #2c3e50; align-items: center; }
+        .box { border-right: 1px solid #ccc; padding: 5px; text-align: center; }
+        .label { font-size: 14px; font-weight: 800; color: #2980b9; display: block; text-transform: uppercase; }
+        .val { font-size: 52px; font-weight: 900; color: #2c3e50; line-height: 1; }
+
+        /* Splash Screen / FS Overlay */
+        #fs-overlay { position: fixed; top:0; left:0; width:100%; height:100%; z-index: 9999; background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; }
+        #fs-overlay svg { width: 150px; height: 150px; margin-bottom: 20px; }
+
+        /* Pannelli Tecnici */
+        #bottom-tech-zone { position: absolute; bottom: 55px; left: 50%; transform: translateX(-50%); width: 95%; display: flex; justify-content: space-between; align-items: flex-end; z-index: 3000; }
+        #config-panel { background: rgba(255,255,255,0.95); padding: 8px 12px; border-radius: 8px; border: 1.5px solid #2c3e50; font-size: 11px; font-weight: bold; min-width: 140px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        #reliability-panel { background: rgba(44, 62, 80, 0.95); color: white; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); min-width: 100px; font-family: monospace; }
+        .rel-item { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+        .rel-val { color: #f1c40f; font-weight: bold; }
+
+        /* Wind Box */
+        #wind-main-container { position: absolute; top: 125px; right: 15px; z-index: 2500; display: flex; flex-direction: column; align-items: center; }
+        #wind-box { background: white; padding: 8px; border-radius: 50%; border: 2px solid #2c3e50; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        #wind-arrow { width: 40px; height: 40px; transition: transform 0.3s linear; }
+        #wind-info-display { background: #2c3e50; color: white; border-radius: 6px; margin-top: 5px; text-align: center; border: 1px solid white; min-width: 85px; }
+
+        #signature-box { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 4000; background: rgba(255,255,255,0.85); padding: 5px 15px; border-radius: 20px; border: 1.5px solid #2c3e50; font-family: cursive; font-size: 12px; font-weight: bold; }
+        #pilot { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 5000; width: 35px; pointer-events: none; }
+        #agl-txt { color: #e67e22; }
+    </style>
+</head>
+<body>
+
+<div id="fs-overlay" onclick="startApp()">
+    <svg viewBox="0 0 512 512">
+        <path d="M100 300c50-40 150-40 200 0sMTUwIDQwIDIwMCAw" fill="none" stroke="#3498db" stroke-width="20" stroke-linecap="round"/>
+        <path d="M256 120c80 0 160 40 160 40s-80 40-160 40-160-40-160-40 80-40 160-40Z" fill="#d4ff00" stroke="#fff" stroke-width="3"/>
+        <path d="M256 120T180 280M256 120T332 280M256 120T256 280" stroke="#fff" stroke-width="1" opacity="0.5"/>
+    </svg>
+    <h2 style="margin:0">RG PROJECT V.3.2.7</h2>
+    <p style="opacity:0.7">Tocca per decollare (Full Screen)</p>
+</div>
+
+<div id="dashboard">
+    <div class="box"><span class="label">ALT (m)</span><span id="alt-txt" class="val">---</span></div>
+    <div class="box"><span class="label">WIND (k/h)</span><span id="spd-txt" class="val">---</span></div>
+    <div class="box"><span class="label">AGL (m)</span><span id="agl-txt" class="val">---</span></div>
+</div>
+
+<div id="wind-main-container">
+    <div id="wind-box" onclick="toggleZoom()">
+        <svg id="wind-arrow" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="3"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+    </div>
+    <div id="wind-info-display">
+        <span id="wind-deg-val" style="font-size:18px; font-weight:bold;">0°</span>
+        <span id="mode-status" style="font-size:9px; display:block; padding:2px; background:#34495e;">STRATEGICA</span>
+    </div>
+</div>
+
+<div id="bottom-tech-zone">
+    <div id="config-panel">
+        GPS: <span id="gps-status" style="color:red;">OFF</span> | <span id="wake-status" style="color:orange;">☕</span><br>
+        <input type="checkbox" id="chkDynamic" checked> SCIA | <input type="checkbox" id="chkMapBN"> B/N
+    </div>
+    <div id="reliability-panel">
+        <div class="rel-item">🕒 <span id="rel-time" class="rel-val">0'</span></div>
+        <div class="rel-item">📍 <span id="rel-dist" class="rel-val">0k</span></div>
+        <div class="rel-item">🏔️ <span id="rel-alt" class="rel-val">0m</span></div>
+    </div>
+</div>
+
+<div id="signature-box">RG Project Stand-Alone</div>
+
+<svg id="pilot" viewBox="0 0 24 24" fill="#3498db" stroke="white" stroke-width="1.5"><path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z"/></svg>
+
+<div id="viewport"><div id="map"></div></div>
+<canvas id="aeroCanvas"></canvas>
+
+<script>
+    const PUNTI_PER_GRADO = 1200;
+    const STEP_METRI = 90;
+    let terrainData = null, currentTile = "", map = null, canvas = null, ctx = null;
+    let isDynamic = true, isTacticMode = false;
+    let flight = { lat: 0, lon: 0, hdg: 0, alt: 0, windSpd: 0, windDir: 0 };
+    let lastWindUpdate = { time: Date.now(), lat: 0, lon: 0, alt: 0 };
+
+    function startApp() {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) { elem.requestFullscreen(); }
+        else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); }
+        document.getElementById('fs-overlay').style.display = 'none';
+        init();
+    }
+
+    async function init() {
+        canvas = document.getElementById('aeroCanvas');
+        ctx = canvas.getContext('2d');
+        map = L.map('map', { zoomControl: false, attributionControl: false, dragging: false }).setView([44.8, 9.1], 12);
+        L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png').addTo(map);
+
+        if ("geolocation" in navigator) {
+            navigator.geolocation.watchPosition(updatePosition, null, { enableHighAccuracy: true });
+        }
+
+        document.getElementById('chkMapBN').addEventListener('change', (e) => {
+            const m = document.getElementById('map');
+            if(e.target.checked) m.classList.add('map-bn'); else m.classList.remove('map-bn');
+        });
+
+        window.onresize = resize; resize();
+        setInterval(refreshReliabilityUI, 5000);
+        if ('wakeLock' in navigator) {
+            try { await navigator.wakeLock.request('screen'); document.getElementById('wake-status').style.color="green"; } catch(e){}
+        }
+    }
+
+    function updatePosition(pos) {
+        document.getElementById('gps-status').innerText = "LIVE";
+        document.getElementById('gps-status').style.color = "green";
+        flight.lat = pos.coords.latitude;
+        flight.lon = pos.coords.longitude;
+        flight.alt = Math.round(pos.coords.altitude || 0);
+        flight.hdg = pos.coords.heading || 0;
+        updateView();
+    }
+
+    async function updateView() {
+        if (flight.lat === 0) return;
+        map.setView([flight.lat, flight.lon], map.getZoom(), { animate: false });
+        document.getElementById('map').style.transform = `rotate(${-flight.hdg}deg)`;
+        document.getElementById('alt-txt').innerText = flight.alt;
+        document.getElementById('spd-txt').innerText = flight.windSpd;
+        
+        let arrowRot = (flight.windDir - flight.hdg) + 180;
+        document.getElementById('wind-arrow').style.transform = `rotate(${arrowRot}deg)`;
+        document.getElementById('wind-deg-val').innerText = Math.round(flight.windDir) + "°";
+
+        let tID = `map_${Math.floor(flight.lat)}_${Math.floor(flight.lon)}`;
+        if (currentTile !== tID) {
+            try {
+                let res = await fetch(`data_json/${tID}.json`);
+                if (res.ok) { terrainData = (await res.json()).data; currentTile = tID; }
+            } catch(e) {}
+        }
+        drawAnalysis();
+    }
+
+    function drawAnalysis() {
+        if (!terrainData) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let wspd = flight.windSpd, wdir = flight.windDir;
+        let rad = (wdir - 90) * (Math.PI / 180), vx = -Math.cos(rad), vy = Math.sin(rad);
+        let res = 6, rangeIdx = 0.045 / Math.pow(2, (map.getZoom() - 12));
+        let dropValue = Math.max(8, 40 - (wspd * 0.8));
+        let maxSteps = isDynamic ? Math.min(16, Math.floor(wspd / 1.5) + 4) : 6;
+
+        for (let x = 0; x < canvas.width; x += res) {
+            for (let y = 0; y < canvas.height; y += res) {
+                let relX = (x - canvas.width / 2) / (canvas.width / 2) * rangeIdx;
+                let relY = -(y - canvas.height / 2) / (canvas.height / 2) * rangeIdx;
+                let aH = -flight.hdg * (Math.PI / 180);
+                let pLon = flight.lon + (relX * Math.cos(aH) - relY * Math.sin(aH));
+                let pLat = flight.lat + (relX * Math.sin(aH) + relY * Math.cos(aH));
+                let cx = Math.floor((pLon % 1) * PUNTI_PER_GRADO), cy = (PUNTI_PER_GRADO - 1) - Math.floor((pLat % 1) * PUNTI_PER_GRADO);
+                
+                if (terrainData[cy] && terrainData[cy][cx]) {
+                    let h = terrainData[cy][cx];
+                    if (Math.abs(x - canvas.width/2) < res && Math.abs(y - canvas.height/2) < res) {
+                        document.getElementById('agl-txt').innerText = Math.round(flight.alt - h);
+                    }
+                    if (h >= flight.alt) { ctx.fillStyle = "rgba(40,40,40,0.8)"; ctx.fillRect(x,y,res,res); continue; }
+                    let inWake = false;
+                    for (let d = 1; d <= maxSteps; d++) {
+                        let lx = Math.floor(((pLon - vx*0.00025*d) % 1) * PUNTI_PER_GRADO), ly = (PUNTI_PER_GRADO-1) - Math.floor(((pLat - vy*0.00025*d) % 1) * PUNTI_PER_GRADO);
+                        if (terrainData[ly] && terrainData[ly][lx] > (flight.alt - (d * dropValue))) { inWake = true; break; }
+                    }
+                    let gx = ((terrainData[cy][cx+1]||h)-(terrainData[cy][cx-1]||h))/(2*STEP_METRI), gy = ((terrainData[cy+1]?terrainData[cy+1][cx]:h)-(terrainData[cy-1]?terrainData[cy-1][cx]:h))/(2*STEP_METRI);
+                    let force = (vx * gx + vy * gy) * (wspd / 10);
+                    if (inWake) ctx.fillStyle = "rgba(100,100,100,0.6)";
+                    else if (force < -0.12) ctx.fillStyle = "rgba(231,76,60,0.7)";
+                    else if (force > 0.08) ctx.fillStyle = "rgba(46,204,113,0.6)";
+                    else ctx.fillStyle = "rgba(0,0,0,0)";
+                    ctx.fillRect(x,y,res,res);
+                }
+            }
+        }
+    }
+
+    function toggleZoom() {
+        isTacticMode = !isTacticMode;
+        map.setZoom(isTacticMode ? 14.6 : 12);
+        document.getElementById('mode-status').innerText = isTacticMode ? "TATTICA" : "STRATEGICA";
+        document.getElementById('mode-status').style.background = isTacticMode ? "#e67e22" : "#34495e";
+    }
+
+    function refreshReliabilityUI() {
+        let diffMin = Math.floor((Date.now() - lastWindUpdate.time) / 60000);
+        document.getElementById('rel-time').innerText = diffMin + "'";
+        if (lastWindUpdate.lat !== 0) {
+            let d = calculateDist(flight.lat, flight.lon, lastWindUpdate.lat, lastWindUpdate.lon);
+            document.getElementById('rel-dist').innerText = d.toFixed(1) + "k";
+        }
+        document.getElementById('rel-alt').innerText = lastWindUpdate.alt + "m";
+    }
+
+    function calculateDist(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        let dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+        let a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+</script>
+</body>
+</html>
